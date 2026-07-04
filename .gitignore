@@ -2,6 +2,7 @@
 .env
 
 # Python
+*.pyc
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -24,3 +25,7 @@ venv/
 PROJECT.md
 pixel-ui-plan.md
 teach.md
+
+# 内存数据
+*.db
+*.sqlite
