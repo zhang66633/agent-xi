@@ -55,10 +55,10 @@ async def main():
     print()
 
     # 固定的测试问题
-    user_input = "用一句话介绍自己"
+    user_input = "今天南京天气怎么样？"
     print(f"我：{user_input}")
     print()
-    print("Deepseek：",end="",flush=True)
+    print("XI：",end="",flush=True)
 
     # 调用Agent
     reply = await chat(user_input)
