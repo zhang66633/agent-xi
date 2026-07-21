@@ -33,12 +33,45 @@ export interface HistoryMessage {
   text: string;
 }
 
+export interface MarketItem {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  installed: boolean;
+  env?: Record<string, string>;   // 仅 MCP：需要填写的环境变量键
+  needs_restart?: boolean;        // 仅 MCP：变更需重启后端生效
+}
+
+export interface MarketResult {
+  ok: boolean;
+  message?: string;
+  error?: string;
+}
+
 class ApiClient {
   private async _get<T>(path: string): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8_000);
     try {
       const res = await fetch(`${API_BASE}${path}`, { signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      return res.json() as Promise<T>;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async _post<T>(path: string, body: unknown): Promise<T> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8_000);
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       return res.json() as Promise<T>;
     } finally {
@@ -74,6 +107,36 @@ class ApiClient {
     } catch {
       return [];
     }
+  }
+
+  // ─── 市场 ─────────────────────────────────────────────
+
+  /** MCP 服务器列表（installed 以 mcp.yaml 为准） */
+  async marketMcp(): Promise<MarketItem[]> {
+    const data = await this._get<{ items: MarketItem[] }>('/api/market/mcp');
+    return data.items ?? [];
+  }
+
+  /** 技能包列表（installed 以 SkillStore 为准） */
+  async marketSkills(): Promise<MarketItem[]> {
+    const data = await this._get<{ items: MarketItem[] }>('/api/market/skills');
+    return data.items ?? [];
+  }
+
+  /** 安装 MCP（可带 env 值）或技能 */
+  async marketInstall(
+    type: 'mcp' | 'skill',
+    id: string,
+    env?: Record<string, string>,
+  ): Promise<MarketResult> {
+    return this._post<MarketResult>('/api/market/install', {
+      type, id, ...(env ? { env } : {}),
+    });
+  }
+
+  /** 卸载 MCP 或技能 */
+  async marketUninstall(type: 'mcp' | 'skill', id: string): Promise<MarketResult> {
+    return this._post<MarketResult>('/api/market/uninstall', { type, id });
   }
 }
 

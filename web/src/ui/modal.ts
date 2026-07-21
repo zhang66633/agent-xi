@@ -86,4 +86,9 @@ export class Modal {
   get isOpen(): boolean {
     return !this.overlay.hidden;
   }
+
+  /** 内容容器（供调用方查询弹窗内的表单元素） */
+  get body(): HTMLElement {
+    return this.bodyEl;
+  }
 }

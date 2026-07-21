@@ -23,6 +23,7 @@ import { DetailPanel } from './ui/detail';
 import { CommandInput, detectCommandType } from './ui/command';
 import { StatusBar } from './ui/statusbar';
 import { ToolConfirmDialog } from './ui/tool_confirm';
+import { MarketView } from './ui/market';
 import type { Agent, LogEntry, Quest, LogType } from './types';
 
 // 后端轮询间隔
@@ -47,6 +48,7 @@ export class App {
   private cmd!: CommandInput;
   private status!: StatusBar;
   private confirmDialog!: ToolConfirmDialog;
+  private market!: MarketView;
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private currentAgentId: string | null = null;
@@ -81,6 +83,20 @@ export class App {
     this._bindCommand();
     this._bindWs();
     this._bindConnection();
+
+    // 商店视图：进入时刷新列表，操作结果推送日志
+    this.market = new MarketView();
+    this.market.setEventHandler((text, kind) => {
+      this.log.append({
+        id: `mkt-${Date.now()}`,
+        time: this._now(),
+        type: kind === 'error' ? 'error' : 'system',
+        text,
+      });
+    });
+    this.router.onChange((view) => {
+      if (view === 'market') void this.market.refresh();
+    });
 
     // 启动：先放 Xi 占位 + 演示智能体，再尝试连后端
     this._initRoster();

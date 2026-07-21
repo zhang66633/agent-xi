@@ -135,21 +135,30 @@ def create_app(session_manager: SessionManager) -> FastAPI:
 
     # ─── 市场 API ─────────────────────────────────────────────────
 
+    def _skill_store():
+        """取 SessionManager 持有的 SkillStore（可能为 None）。"""
+        matcher = getattr(session_manager, "_skill_matcher", None)
+        return matcher._store if matcher else None
+
     @app.get("/api/market/mcp")
     async def market_mcp() -> dict:
-        """列出可安装的 MCP 服务器。"""
-        from .market import MCP_MARKET
-        return {"items": MCP_MARKET}
+        """列出可安装的 MCP 服务器（installed 以 mcp.yaml 为准）。"""
+        from .market import MCP_MARKET, sync_installed_states
+        sync_installed_states(_skill_store())
+        # MCP 配置变更需重启后端才能生效（暂不支持热加载）
+        items = [{**m, "needs_restart": True} for m in MCP_MARKET]
+        return {"items": items}
 
     @app.get("/api/market/skills")
     async def market_skills() -> dict:
-        """列出可安装的技能包。"""
-        from .market import SKILL_MARKET
+        """列出可安装的技能包（installed 以 SkillStore 为准）。"""
+        from .market import SKILL_MARKET, sync_installed_states
+        sync_installed_states(_skill_store())
         return {"items": SKILL_MARKET}
 
     @app.post("/api/market/install")
     async def market_install(data: dict) -> dict:
-        """安装 MCP 服务器或技能。"""
+        """安装 MCP 服务器或技能。MCP 可携带 env 值。"""
         item_type = data.get("type", "")  # "mcp" | "skill"
         item_id = data.get("id", "")
         if not item_type or not item_id:
@@ -157,12 +166,30 @@ def create_app(session_manager: SessionManager) -> FastAPI:
 
         if item_type == "mcp":
             from .market import install_mcp
-            result = install_mcp(item_id)
+            env = data.get("env") if isinstance(data.get("env"), dict) else None
+            result = install_mcp(item_id, env)
         elif item_type == "skill":
             from .market import install_skill
-            matcher = session_manager._skill_matcher
-            store = matcher._store if matcher else None
-            result = await install_skill(item_id, store)
+            result = await install_skill(item_id, _skill_store())
+        else:
+            return {"ok": False, "error": f"未知类型: {item_type}"}
+
+        return result
+
+    @app.post("/api/market/uninstall")
+    async def market_uninstall(data: dict) -> dict:
+        """卸载 MCP 服务器或技能。"""
+        item_type = data.get("type", "")  # "mcp" | "skill"
+        item_id = data.get("id", "")
+        if not item_type or not item_id:
+            return {"ok": False, "error": "缺少 type 或 id"}
+
+        if item_type == "mcp":
+            from .market import uninstall_mcp
+            result = uninstall_mcp(item_id)
+        elif item_type == "skill":
+            from .market import uninstall_skill
+            result = await uninstall_skill(item_id, _skill_store())
         else:
             return {"ok": False, "error": f"未知类型: {item_type}"}
 
