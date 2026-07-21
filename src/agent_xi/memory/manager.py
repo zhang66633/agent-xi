@@ -1,10 +1,13 @@
-"""记忆管理器 — 统一协调三层记忆。
+"""记忆管理器 — 统一协调两层持久记忆。
 
 职责：
-- 初始化并持有三层记忆实例
+- 初始化并持有情景记忆 / 语义记忆实例
 - 提供统一的 remember / recall 接口
 - 对话结束时触发 LLM 深度提取（语义记忆）
 - 规则快捕：每轮用户输入后自动扫描偏好/事实
+
+注：对话滑动窗口（原 WorkingMemory）已移除，
+当前对话历史由 Brain.history + ContextBuilder 裁剪管理。
 """
 
 from __future__ import annotations
@@ -17,7 +20,6 @@ from ..llm.types import ChatRequest, Message, Role
 from .embedding import EmbeddingClient
 from .episodic import EpisodicMemory
 from .semantic import SemanticMemory
-from .working import WorkingMemory
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +43,11 @@ class MemoryManager:
         data_dir: Path,
         embedding_client: EmbeddingClient,
         llm_client: LLMClient,
-        max_working_turns: int = 50,
     ) -> None:
         self._data_dir = data_dir
         self._llm = llm_client
 
-        # 初始化三层记忆
-        self.working = WorkingMemory(max_turns=max_working_turns)
+        # 初始化两层持久记忆（对话窗口由 Brain.history + ContextBuilder 管理）
         self.episodic = EpisodicMemory(
             db_path=data_dir / "episodic",
             embedding_client=embedding_client,

@@ -41,6 +41,7 @@ async def _async_main(settings: object) -> None:
     from ..tools.builtins import load_all_builtins
     from ..tools.registry import ToolRegistry
     from .app import create_app
+    from .history_store import SessionStore
     from .session import SessionManager
 
     async with create_client(settings.llm) as client:
@@ -60,7 +61,6 @@ async def _async_main(settings: object) -> None:
             data_dir=data_dir,
             embedding_client=embedding_client,
             llm_client=client,
-            max_working_turns=settings.max_history_turns,
         )
 
         # Tools
@@ -88,7 +88,8 @@ async def _async_main(settings: object) -> None:
             has_memory=True,
         )
 
-        # Session manager
+        # Session manager（含历史持久化）
+        session_store = SessionStore(data_dir)
         session_mgr = SessionManager(
             client=client,
             memory=memory,
@@ -98,6 +99,7 @@ async def _async_main(settings: object) -> None:
             max_history_turns=settings.max_history_turns,
             max_context_tokens=settings.max_context_tokens,
             reserved_output_tokens=settings.reserved_output_tokens,
+            store=session_store,
         )
 
         # FastAPI app

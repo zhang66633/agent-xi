@@ -28,6 +28,11 @@ export interface HealthInfo {
   sessions: number;
 }
 
+export interface HistoryMessage {
+  role: string;   // "user" | "assistant"
+  text: string;
+}
+
 class ApiClient {
   private async _get<T>(path: string): Promise<T> {
     const ctrl = new AbortController();
@@ -57,6 +62,18 @@ class ApiClient {
   async listSkills(): Promise<SkillInfo[]> {
     const data = await this._get<{ skills: SkillInfo[] }>('/api/skills');
     return data.skills ?? [];
+  }
+
+  /** 拉取会话持久化历史（刷新后重建日志用） */
+  async history(sessionId: string): Promise<HistoryMessage[]> {
+    try {
+      const data = await this._get<{ ok: boolean; messages: HistoryMessage[] }>(
+        `/api/history?session_id=${encodeURIComponent(sessionId)}`,
+      );
+      return data.ok ? (data.messages ?? []) : [];
+    } catch {
+      return [];
+    }
   }
 }
 

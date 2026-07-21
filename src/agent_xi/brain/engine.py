@@ -191,15 +191,28 @@ class Brain:
             tool_results: list[ToolResultBlock] = []
 
             for tool_use in collected_tool_uses:
-                result_block = await self._execute_tool(tool_use)
+                # 通知消费方：工具开始执行（前端据此推进任务进度）
+                yield StreamEvent(
+                    type=StreamEventType.TOOL_EXECUTING,
+                    tool_name=tool_use.name,
+                )
+
+                result_block, denied = await self._execute_tool(tool_use)
                 tool_results.append(result_block)
 
-                # yield 工具执行结果事件（供 CLI 显示）
-                yield StreamEvent(
-                    type=StreamEventType.TOOL_RESULT,
-                    tool_name=tool_use.name,
-                    text=result_block.content[:200],  # 截断显示
-                )
+                if denied:
+                    # 用户拒绝执行：发专用事件（前端记 [已拒绝]）
+                    yield StreamEvent(
+                        type=StreamEventType.TOOL_CONFIRM_DENIED,
+                        tool_name=tool_use.name,
+                    )
+                else:
+                    # yield 工具执行结果事件（供 CLI 显示）
+                    yield StreamEvent(
+                        type=StreamEventType.TOOL_RESULT,
+                        tool_name=tool_use.name,
+                        text=result_block.content[:200],  # 截断显示
+                    )
 
             # 将工具结果加入历史（每个结果一条 tool 消息，OpenAI 格式要求）
             for result_block in tool_results:
@@ -216,8 +229,12 @@ class Brain:
         # 达到最大迭代次数，记录警告
         logger.warning("ReAct loop reached max iterations (%d)", _MAX_REACT_ITERATIONS)
 
-    async def _execute_tool(self, tool_use: ToolUseBlock) -> ToolResultBlock:
-        """执行单个工具调用，返回 ToolResultBlock。
+    async def _execute_tool(
+        self, tool_use: ToolUseBlock
+    ) -> tuple[ToolResultBlock, bool]:
+        """执行单个工具调用，返回 (ToolResultBlock, denied)。
+
+        denied 为 True 表示用户拒绝了执行（结果块里是拒绝说明）。
 
         流程：
         1. 从 registry 查找工具
@@ -226,12 +243,12 @@ class Brain:
         4. 包装为 ToolResultBlock
         """
         # 查找工具
-        if not self._tools:
+        if self._tools is None:
             return ToolResultBlock(
                 tool_use_id=tool_use.id,
                 content="错误：工具系统未初始化",
                 is_error=True,
-            )
+            ), False
 
         tool = self._tools.get(tool_use.name)
         if tool is None:
@@ -239,7 +256,7 @@ class Brain:
                 tool_use_id=tool_use.id,
                 content=f"错误：未找到工具 '{tool_use.name}'",
                 is_error=True,
-            )
+            ), False
 
         # 安全确认
         from ..tools.base import SecurityLevel
@@ -254,7 +271,7 @@ class Brain:
                         tool_use_id=tool_use.id,
                         content="用户拒绝了此工具的执行。请换一种方式回答。",
                         is_error=True,
-                    )
+                    ), True
 
         # 执行工具
         try:
@@ -263,20 +280,20 @@ class Brain:
                 return ToolResultBlock(
                     tool_use_id=tool_use.id,
                     content=result.output,
-                )
+                ), False
             else:
                 return ToolResultBlock(
                     tool_use_id=tool_use.id,
                     content=f"工具执行失败：{result.error}",
                     is_error=True,
-                )
+                ), False
         except Exception as e:
             logger.exception("Tool '%s' execution failed", tool_use.name)
             return ToolResultBlock(
                 tool_use_id=tool_use.id,
                 content=f"工具执行异常：{type(e).__name__}: {e}",
                 is_error=True,
-            )
+            ), False
 
     @staticmethod
     def _build_tool_use_block(name: str, args_json: str) -> ToolUseBlock:

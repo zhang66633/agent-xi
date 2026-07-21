@@ -60,7 +60,6 @@ async def _async_main(settings: AppSettings) -> None:
             data_dir=data_dir,
             embedding_client=embedding_client,
             llm_client=client,
-            max_working_turns=settings.max_history_turns,
         )
 
         # 自动发现并注册所有内置工具

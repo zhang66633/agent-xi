@@ -20,6 +20,7 @@ venv/
 
 # 记忆文件（运行时生成）
 .agent_xi/
+.data/
 
 # 计划文件
 PROJECT.md

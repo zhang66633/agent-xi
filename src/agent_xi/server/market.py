@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
+
+if TYPE_CHECKING:
+    from ..skills.store import SkillStore
 
 logger = logging.getLogger(__name__)
 
@@ -161,26 +165,33 @@ def install_mcp(item_id: str) -> dict:
     return {"ok": True, "message": f"{item['name']} 已安装，重启后生效"}
 
 
-def install_skill(item_id: str) -> dict:
-    """将技能写入 skills 数据库。"""
+async def install_skill(item_id: str, store: SkillStore | None) -> dict:
+    """将技能写入 skills 数据库。
+
+    store 由调用方注入（SessionManager 持有的同一实例），
+    避免重复打开 SQLite/LanceDB 连接。
+    """
     item = next((s for s in SKILL_MARKET if s["id"] == item_id), None)
     if not item:
         return {"ok": False, "error": f"未找到技能: {item_id}"}
+    if store is None:
+        return {"ok": False, "error": "技能存储不可用（embedding 未配置？）"}
 
     # 延迟导入避免循环依赖
     try:
-        from ..skills.store import SkillStore
         from ..skills.models import Skill
 
-        store = SkillStore()
+        if store.get(item_id) is not None:
+            return {"ok": False, "error": f"{item['name']} 已安装"}
+
         skill = Skill(
             id=item_id,
             name=item["name"],
             description=item["description"],
-            keywords=item["keywords"],
+            trigger_keywords=item["keywords"],
             steps=item["steps"],
         )
-        store.save(skill)
+        await store.save(skill)
         item["installed"] = True
         logger.info("Skill installed: %s", item_id)
         return {"ok": True, "message": f"{item['name']} 已安装"}

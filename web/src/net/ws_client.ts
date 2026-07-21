@@ -8,6 +8,7 @@
  *   { type: "command", content: "/clear" }
  *
  * 服务端 → 客户端:
+ *   { type: "session_init", session_id: "...", restored: true, turns: 3 }
  *   { type: "text_delta", text: "你" }
  *   { type: "tool_use_start", tool_name: "get_time" }
  *   { type: "tool_executing", tool_name: "get_time" }
@@ -17,7 +18,12 @@
  *   { type: "done" }
  *   { type: "error", message: "..." }
  *   { type: "system", message: "..." }
+ *
+ * 会话持久化：
+ *   连接时附带 ?session_id=<localStorage 中的值>，
+ *   收到 session_init 后把服务端确认的 id 写回 localStorage。
  */
+import { SESSION_STORAGE_KEY } from '../config';
 
 export interface WsIncoming {
   type: string;
@@ -26,6 +32,9 @@ export interface WsIncoming {
   preview?: string;
   args?: Record<string, unknown>;
   message?: string;
+  session_id?: string;
+  restored?: boolean;
+  turns?: number;
 }
 
 type EventHandler = (msg: WsIncoming) => void;
@@ -49,7 +58,13 @@ export class WsClient {
       return;
     }
 
-    this.ws = new WebSocket(this.url);
+    // 附带本地保存的 session_id，让后端恢复历史
+    let url = this.url;
+    const savedId = this._loadSessionId();
+    if (savedId) {
+      url += `${this.url.includes('?') ? '&' : '?'}session_id=${encodeURIComponent(savedId)}`;
+    }
+    this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       this._connected = true;
@@ -61,6 +76,10 @@ export class WsClient {
     this.ws.onmessage = (event) => {
       try {
         const msg: WsIncoming = JSON.parse(event.data as string);
+        // 服务端确认会话 id → 持久化到 localStorage
+        if (msg.type === 'session_init' && msg.session_id) {
+          this._saveSessionId(msg.session_id);
+        }
         this._emit(msg.type, msg);
         this._emit('*', msg);
       } catch {
@@ -146,6 +165,31 @@ export class WsClient {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+  }
+
+  /** 清除本地会话 id（下次连接将开启全新会话） */
+  resetSession(): void {
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch {
+      /* localStorage 不可用时静默 */
+    }
+  }
+
+  private _loadSessionId(): string | null {
+    try {
+      return localStorage.getItem(SESSION_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  private _saveSessionId(id: string): void {
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, id);
+    } catch {
+      /* localStorage 不可用时静默 */
     }
   }
 

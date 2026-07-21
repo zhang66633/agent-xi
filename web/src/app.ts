@@ -224,6 +224,38 @@ export class App {
 
   // ─── WS 事件 → UI ────────────────────────────────────
   private _bindWs(): void {
+    // 会话恢复：后端确认了带历史的会话 → 拉取记录重建日志
+    this.ws.on('session_init', async (msg) => {
+      if (!msg.restored || !msg.session_id) return;
+      const messages = await api.history(msg.session_id);
+      if (messages.length === 0) return;
+      this.log.append({
+        id: `sys-${Date.now()}`,
+        time: this._now(),
+        type: 'system',
+        text: `已恢复上次会话（${msg.turns ?? 0} 轮对话）`,
+      });
+      for (const m of messages) {
+        if (m.role === 'user') {
+          this.log.append({
+            id: `hist-u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            time: this._now(),
+            type: 'info',
+            source: '指挥官',
+            text: m.text,
+          });
+        } else {
+          this.log.append({
+            id: `hist-a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            time: this._now(),
+            type: 'chat',
+            source: 'Xi',
+            text: m.text,
+          });
+        }
+      }
+    });
+
     this.ws.on('text_delta', (msg) => {
       this.log.appendStream(msg.text ?? '', { type: 'chat', source: 'Xi' });
     });

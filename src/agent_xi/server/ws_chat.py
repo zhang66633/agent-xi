@@ -4,6 +4,8 @@
 - 接收客户端消息 → 调用 Brain.chat() → 逐事件推送 JSON
 - 工具确认：推送 confirm_request → 等待客户端回复 → asyncio.Event 唤醒
 - 命令处理（/clear, /history 等）
+- 会话持久化：连接建立时下发 session_init（含 session_id），
+  每轮对话结束后通过 SessionManager 落盘历史
 """
 
 from __future__ import annotations
@@ -11,12 +13,15 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ..llm.types import StreamEventType
 from .session import Session
+
+if TYPE_CHECKING:
+    from .session import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +29,7 @@ logger = logging.getLogger(__name__)
 async def handle_ws_chat(
     ws: WebSocket,
     session: Session,
+    session_manager: SessionManager | None = None,
 ) -> None:
     """处理单个 WS 连接的对话循环。
 
@@ -34,6 +40,7 @@ async def handle_ws_chat(
       {"type": "command", "content": "/clear"}
 
     服务端 → 客户端：
+      {"type": "session_init", "session_id": "...", "restored": true, "turns": 3}
       {"type": "text_delta", "text": "你"}
       {"type": "tool_use_start", "tool_name": "get_time"}
       {"type": "tool_result", "tool_name": "get_time", "preview": "..."}
@@ -44,6 +51,15 @@ async def handle_ws_chat(
     """
     await ws.accept()
     logger.info("WS connected: session=%s", session.id)
+
+    # 下发会话标识（前端存入 localStorage，重连时上报以恢复历史）
+    brain = session.brain
+    await ws.send_json({
+        "type": "session_init",
+        "session_id": session.id,
+        "restored": brain.turn_count > 0 if brain else False,
+        "turns": brain.turn_count if brain else 0,
+    })
 
     # 工具确认机制
     confirm_event = asyncio.Event()
@@ -71,7 +87,6 @@ async def handle_ws_chat(
         return confirm_result.get("allowed", False)
 
     # 注入 confirm_callback 到 Brain
-    brain = session.brain
     if brain:
         brain._confirm_callback = ws_confirm_callback
 
@@ -98,7 +113,9 @@ async def handle_ws_chat(
 
             # ─── 命令处理 ───
             if msg_type == "command":
-                await _handle_command(ws, brain, msg.get("content", ""))
+                await _handle_command(
+                    ws, brain, msg.get("content", ""), session, session_manager
+                )
                 continue
 
             # ─── 对话消息 ───
@@ -109,7 +126,9 @@ async def handle_ws_chat(
 
                 # 检查是否是斜杠命令
                 if content.startswith("/"):
-                    await _handle_command(ws, brain, content)
+                    await _handle_command(
+                        ws, brain, content, session, session_manager
+                    )
                     continue
 
                 if not brain:
@@ -135,10 +154,30 @@ async def handle_ws_chat(
                 # 发送 done 标记
                 await ws.send_json({"type": "done"})
 
+                # 持久化会话历史（刷新 / 重连后可恢复）
+                if session_manager:
+                    session_manager.save_session(session)
+
     except WebSocketDisconnect:
         logger.info("WS disconnected: session=%s", session.id)
     except Exception as e:
         logger.error("WS error: %s", e)
+    finally:
+        # 会话结束 → LLM 深度提取语义记忆（与 CLI 行为对齐）
+        await _extract_on_close(brain)
+
+
+async def _extract_on_close(brain: Any) -> None:
+    """连接关闭时触发深度记忆提取，失败不影响清理流程。"""
+    memory = getattr(brain, "_memory", None) if brain else None
+    if not memory or brain.turn_count < 1:
+        return
+    try:
+        extracted = await memory.on_conversation_end(brain.history)
+        if extracted:
+            logger.info("会话结束提取：%d 条新记忆", len(extracted))
+    except Exception:
+        logger.exception("会话结束记忆提取失败")
 
 
 def _event_to_ws_message(event: Any) -> dict[str, Any] | None:
@@ -181,7 +220,11 @@ def _event_to_ws_message(event: Any) -> dict[str, Any] | None:
 
 
 async def _handle_command(
-    ws: WebSocket, brain: Any, command: str
+    ws: WebSocket,
+    brain: Any,
+    command: str,
+    session: Session | None = None,
+    session_manager: SessionManager | None = None,
 ) -> None:
     """处理斜杠命令。"""
     parts = command.split(maxsplit=1)
@@ -191,6 +234,9 @@ async def _handle_command(
         case "/clear":
             if brain:
                 brain.clear_history()
+            # 同步清空持久化历史，避免刷新后"复活"
+            if session and session_manager:
+                session_manager.save_session(session)
             await ws.send_json({
                 "type": "system",
                 "message": "对话已清空",
@@ -203,12 +249,85 @@ async def _handle_command(
                 "message": f"当前对话：{turns} 轮",
             })
 
+        case "/memory":
+            memory = getattr(brain, "_memory", None) if brain else None
+            if not memory:
+                await ws.send_json({
+                    "type": "system",
+                    "message": "记忆系统未初始化",
+                })
+                return
+            ep = memory.episodic.count
+            se = memory.semantic.count
+            lines = [f"记忆统计：情景记忆 {ep} 条 · 语义记忆 {se} 条"]
+            facts = memory.semantic.get_all(limit=5)
+            if facts:
+                lines.append("最近记忆：")
+                lines.extend(f"- {f['content']}" for f in facts)
+            else:
+                lines.append("（还没有记住关于你的任何事）")
+            await ws.send_json({
+                "type": "system",
+                "message": "\n".join(lines),
+            })
+
+        case "/skills":
+            matcher = getattr(brain, "_skill_matcher", None) if brain else None
+            store = getattr(matcher, "_store", None) if matcher else None
+            if not store:
+                await ws.send_json({
+                    "type": "system",
+                    "message": "技能系统未初始化",
+                })
+                return
+            skills = store.list_all()
+            if skills:
+                lines = [f"已装技能：{len(skills)} 个"]
+                lines.extend(
+                    f"- {s.name}（使用 {s.use_count} 次）" for s in skills
+                )
+            else:
+                lines = ["还没有安装任何技能"]
+            await ws.send_json({
+                "type": "system",
+                "message": "\n".join(lines),
+            })
+
+        case "/remember":
+            content = parts[1].strip() if len(parts) > 1 else ""
+            memory = getattr(brain, "_memory", None) if brain else None
+            if not content:
+                await ws.send_json({
+                    "type": "system",
+                    "message": "用法：/remember <要记住的内容>",
+                })
+                return
+            if not memory:
+                await ws.send_json({
+                    "type": "system",
+                    "message": "记忆系统未初始化",
+                })
+                return
+            try:
+                await memory.remember_episode(content, tags=["user_explicit"])
+                await ws.send_json({
+                    "type": "system",
+                    "message": f"已记住：{content}",
+                })
+            except Exception as e:
+                logger.error("remember_episode failed: %s", e)
+                await ws.send_json({
+                    "type": "system",
+                    "message": f"记忆失败：{e}",
+                })
+
         case "/help":
             await ws.send_json({
                 "type": "system",
                 "message": (
                     "可用命令：/clear（清空）、/history（轮次）、"
-                    "/memory（记忆统计）、/skills（技能列表）、/help"
+                    "/memory（记忆统计）、/skills（技能列表）、"
+                    "/remember <内容>（记住某事）、/help"
                 ),
             })
 
