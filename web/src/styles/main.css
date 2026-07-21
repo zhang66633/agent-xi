@@ -533,6 +533,198 @@ html, body {
   letter-spacing: 0.5px;
 }
 
+/* ─── 附件（P4 多模态上传）──────────────────────────────── */
+
+/* 回形针按钮（命令栏内，输入框左侧） */
+.btn-attach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  color: var(--gold);
+  background: var(--wood-dark);
+  border: 2px solid var(--wood-darkest);
+  cursor: pointer;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.15),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    2px 2px 0 rgba(0, 0, 0, 0.4);
+  transition: all var(--transition);
+}
+.btn-attach:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold-deep);
+  transform: translate(-1px, -1px);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.15),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    3px 3px 0 rgba(0, 0, 0, 0.4);
+}
+.btn-attach:active {
+  transform: translate(1px, 1px);
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* 附件预览条（命令栏上方） */
+#attach-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--wood-dark);
+  border-top: 2px solid var(--wood-darkest);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+#attach-preview.uploading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.attach-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 22px 4px 6px;
+  background: var(--wood-darkest);
+  border: 2px solid var(--wood-mid);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.1),
+    2px 2px 0 rgba(0, 0, 0, 0.4);
+  animation: logIn 0.2s ease;
+}
+
+.attach-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border: 2px solid var(--wood-darkest);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.2);
+  image-rendering: pixelated;
+}
+
+.attach-icon {
+  font-size: 14px;
+  color: var(--gold);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+.attach-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--cream);
+}
+
+.attach-size {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+.attach-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  color: #fff;
+  background: var(--c-error);
+  border: 2px solid var(--wood-darkest);
+  cursor: pointer;
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+  transition: all var(--transition);
+}
+.attach-remove:hover {
+  background: var(--c-error-deep);
+  transform: translate(-1px, -1px);
+}
+
+/* 拖拽悬停高亮（日志区整体覆盖层） */
+#log-panel.drag-over {
+  position: relative;
+}
+#log-panel.drag-over::after {
+  content: "▣ 松开以添加附件";
+  position: absolute;
+  inset: 4px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(42, 26, 14, 0.78);
+  border: 2px dashed var(--gold);
+  box-shadow: inset 0 0 0 4px rgba(244, 208, 63, 0.12);
+  color: var(--gold-bright);
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+/* 日志行附件区 */
+.log-attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-basis: 100%;
+  margin-top: 2px;
+  padding-left: 56px;
+}
+
+.log-attach-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border: 2px solid var(--wood-darkest);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+  cursor: zoom-in;
+  transition: all var(--transition);
+}
+.log-attach-thumb:hover {
+  border-color: var(--gold-deep);
+  box-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.25),
+    0 0 0 2px rgba(244, 208, 63, 0.35);
+}
+
+.log-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--text-dark);
+  background: rgba(139, 94, 60, 0.16);
+  border: 1px solid var(--wood-mid);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* 图片预览 Modal 内大图 */
+.attach-preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: 68vh;
+  margin: 0 auto;
+  border: 2px solid var(--wood-darkest);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+}
+
 /* ═══ Detail Panel (右栏) ════════════════════════════════ */
 #detail-panel {
   display: flex;

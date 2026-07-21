@@ -12,6 +12,7 @@ export class CommandInput {
   private handler: CommandHandler | null = null;
   private history: string[] = [];
   private historyIdx = -1;
+  private allowEmptySend: (() => boolean) | null = null;
 
   constructor() {
     const inputEl = document.getElementById('command-input');
@@ -26,6 +27,11 @@ export class CommandInput {
 
   onCommand(handler: CommandHandler): void {
     this.handler = handler;
+  }
+
+  /** 设置"允许空文本发送"谓词（有待发附件时返回 true） */
+  setAllowEmptySend(predicate: () => boolean): void {
+    this.allowEmptySend = predicate;
   }
 
   focus(): void {
@@ -52,9 +58,12 @@ export class CommandInput {
 
   private _exec(): void {
     const text = this.inputEl.value.trim();
-    if (!text) return;
-    this.history.push(text);
-    this.historyIdx = this.history.length;
+    const canEmpty = this.allowEmptySend?.() ?? false;
+    if (!text && !canEmpty) return;
+    if (text) {
+      this.history.push(text);
+      this.historyIdx = this.history.length;
+    }
     this.inputEl.value = '';
     this.handler?.(text);
   }

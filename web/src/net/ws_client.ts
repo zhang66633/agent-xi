@@ -24,6 +24,7 @@
  *   收到 session_init 后把服务端确认的 id 写回 localStorage。
  */
 import { SESSION_STORAGE_KEY } from '../config';
+import type { AttachmentMeta } from '../types';
 
 export interface WsIncoming {
   type: string;
@@ -111,10 +112,22 @@ export class WsClient {
     this.reconnectAttempts = 0;
   }
 
-  /** 发送聊天消息 */
-  sendChat(content: string): void {
-    this._send({ type: 'chat', content });
+  /** 发送聊天消息（可携带已上传附件的元信息） */
+  sendChat(content: string, attachments?: AttachmentMeta[]): void {
+    const payload: Record<string, unknown> = { type: 'chat', content };
+    if (attachments && attachments.length > 0) {
+      // 只发协议字段，本地预览用的 url 不出网
+      payload.attachments = attachments.map(({ file_id, name, size, mime }) => ({
+        file_id, name, size, mime,
+      }));
+    }
+    this._send(payload);
     this._emit('chat_sent', { type: 'chat_sent', text: content });
+  }
+
+  /** 当前会话 id（session_init 后写入 localStorage；上传 API 需要） */
+  get sessionId(): string | null {
+    return this._loadSessionId();
   }
 
   /** 发送工具确认 */

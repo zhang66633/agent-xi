@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, File, Form, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -228,6 +228,28 @@ def create_app(session_manager: SessionManager) -> FastAPI:
                 for f in facts
             ]
         }
+
+    # ─── 上传 API ─────────────────────────────────────────────────
+
+    @app.post("/api/upload")
+    async def upload_file(
+        file: UploadFile = File(...),
+        session_id: str = Form(...),
+    ) -> dict:
+        """接收上传文件（multipart/form-data），落盘到会话上传目录。
+
+        返回 {ok, file_id, name, size, mime, path}；
+        file_id 随后随 WS chat 消息的 attachments 上报。
+        """
+        from .uploads import save_upload
+
+        content = await file.read()
+        return save_upload(
+            session_id,
+            file.filename or "file",
+            content,
+            file.content_type or "",
+        )
 
     # ─── 静态文件（生产模式）────────────────────────────────────────
 

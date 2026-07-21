@@ -1,8 +1,9 @@
 /**
  * 系统日志（中栏主区域）
- * 渲染时间戳 + 类型徽章 + 内容
+ * 渲染时间戳 + 类型徽章 + 内容 + 附件芯片/缩略图
  */
-import type { LogEntry, LogType } from '../types';
+import type { AttachmentMeta, LogEntry, LogType } from '../types';
+import { Modal } from './modal';
 
 const TYPE_LABEL: Record<LogType, string> = {
   system: '系统',
@@ -21,6 +22,7 @@ export class LogPanel {
   private currentStreamEl: HTMLElement | null = null;
   private streamBuffer = '';
   private autoScroll = true;
+  private previewModal: Modal | null = null;
 
   constructor() {
     this.listEl = document.getElementById('log-list')!;
@@ -93,8 +95,52 @@ export class LogPanel {
       <span class="log-text">${this._escape(sourcePrefix + entry.text)}</span>
     `;
 
+    if (entry.attachments && entry.attachments.length > 0) {
+      row.appendChild(this._renderAttachments(entry.attachments));
+    }
+
     this.listEl.appendChild(row);
     return row;
+  }
+
+  /** 附件区：图片缩略图（点击放大）/ 文件芯片 */
+  private _renderAttachments(attachments: AttachmentMeta[]): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'log-attach';
+    for (const att of attachments) {
+      if (att.mime.startsWith('image/') && att.url) {
+        const img = document.createElement('img');
+        img.className = 'log-attach-thumb';
+        img.src = att.url;
+        img.alt = att.name;
+        img.title = `${att.name}（点击放大）`;
+        img.addEventListener('click', () => this._previewImage(att));
+        wrap.appendChild(img);
+      } else {
+        const chip = document.createElement('span');
+        chip.className = 'log-attach-chip';
+        chip.title = att.name;
+        chip.textContent = `◈ ${att.name} · ${this._fmtSize(att.size)}`;
+        wrap.appendChild(chip);
+      }
+    }
+    return wrap;
+  }
+
+  /** 图片放大预览（懒加载 Modal 实例） */
+  private _previewImage(att: AttachmentMeta): void {
+    if (!this.previewModal) this.previewModal = new Modal();
+    // url 是本地创建的 blob: URL，非用户内容，可安全入 innerHTML；name 转义
+    this.previewModal.show(
+      att.name,
+      `<img class="attach-preview-img" src="${att.url}" alt="${this._escape(att.name)}" />`,
+    );
+  }
+
+  private _fmtSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
   }
 
   private _maybeScroll(): void {

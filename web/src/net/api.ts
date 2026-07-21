@@ -63,6 +63,16 @@ export interface MemoryFact {
   updated_at: number;
 }
 
+export interface UploadResult {
+  ok: boolean;
+  file_id?: string;
+  name?: string;
+  size?: number;
+  mime?: string;
+  path?: string;
+  error?: string;
+}
+
 class ApiClient {
   private async _get<T>(path: string): Promise<T> {
     const ctrl = new AbortController();
@@ -120,6 +130,32 @@ class ApiClient {
       return data.ok ? (data.messages ?? []) : [];
     } catch {
       return [];
+    }
+  }
+
+  // ─── 上传 ─────────────────────────────────────────────
+
+  /** 上传单个文件（multipart/form-data），返回 file_id 等元信息 */
+  async upload(file: File, sessionId: string): Promise<UploadResult> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('session_id', sessionId);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 60_000); // 大文件留足时间
+    try {
+      const res = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: form, // 注意：不设 Content-Type，浏览器自动加 boundary
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        return { ok: false, error: `HTTP ${res.status} ${res.statusText}` };
+      }
+      return res.json() as Promise<UploadResult>;
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    } finally {
+      clearTimeout(timer);
     }
   }
 

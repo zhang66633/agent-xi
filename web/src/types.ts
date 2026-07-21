@@ -20,6 +20,15 @@ export interface Agent {
   totalTasks?: number;     // 累计任务数
 }
 
+/** 附件元信息（上传完成后随 WS chat 消息上报） */
+export interface AttachmentMeta {
+  file_id: string;
+  name: string;
+  size: number;
+  mime: string;
+  url?: string;            // 本地 object URL，仅日志预览用，不发送后端
+}
+
 /** 日志类型 */
 export type LogType = 'system' | 'info' | 'warn' | 'error' | 'tool' | 'chat';
 
@@ -30,6 +39,7 @@ export interface LogEntry {
   type: LogType;
   source?: string;         // 来源智能体名（如 "艾芙"）
   text: string;
+  attachments?: AttachmentMeta[];  // 用户消息附带的附件
 }
 
 /** 任务状态 */

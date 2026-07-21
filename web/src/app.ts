@@ -25,7 +25,8 @@ import { StatusBar } from './ui/statusbar';
 import { ToolConfirmDialog } from './ui/tool_confirm';
 import { MarketView } from './ui/market';
 import { SettingsView } from './ui/settings';
-import type { Agent, LogEntry, Quest, LogType } from './types';
+import { AttachmentManager } from './ui/attachments';
+import type { Agent, AttachmentMeta, LogEntry, Quest, LogType } from './types';
 
 // 后端轮询间隔
 const POLL_INTERVAL = 15_000;
@@ -51,6 +52,7 @@ export class App {
   private confirmDialog!: ToolConfirmDialog;
   private market!: MarketView;
   private settings!: SettingsView;
+  private attach!: AttachmentManager;
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private currentAgentId: string | null = null;
@@ -107,6 +109,18 @@ export class App {
         text,
       });
     });
+
+    // 附件管理器：按钮/拖拽上传 + 预览条，提示推送日志
+    this.attach = new AttachmentManager();
+    this.attach.setEventHandler((text, kind) => {
+      this.log.append({
+        id: `att-${Date.now()}`,
+        time: this._now(),
+        type: kind === 'error' ? 'error' : 'system',
+        text,
+      });
+    });
+    this.cmd.setAllowEmptySend(() => this.attach.pendingCount > 0);
 
     this.router.onChange((view) => {
       if (view === 'market') void this.market.refresh();
@@ -238,8 +252,15 @@ export class App {
   // ─── 命令事件 ─────────────────────────────────────────
   private _bindCommand(): void {
     this.cmd.onCommand((text) => {
-      const { type, isCommand } = detectCommandType(text);
+      void this._handleCommand(text);
+    });
+  }
 
+  /** 处理一次发送：斜杠命令直通；聊天消息先上传附件再携带发送 */
+  private async _handleCommand(text: string): Promise<void> {
+    const { type, isCommand } = detectCommandType(text);
+
+    if (isCommand) {
       this.log.append({
         id: `cmd-${Date.now()}`,
         time: this._now(),
@@ -247,18 +268,53 @@ export class App {
         source: '指挥官',
         text,
       });
-
-      if (isCommand) {
-        const cmd = text.slice(1).toLowerCase();
-        if (cmd.startsWith('clear')) {
-          this.log.clear();
-          return;
-        }
-        this.ws.sendCommand(text);
-      } else {
-        this.ws.sendChat(text);
+      const cmd = text.slice(1).toLowerCase();
+      if (cmd.startsWith('clear')) {
+        this.log.clear();
+        return;
       }
+      this.ws.sendCommand(text);
+      return;
+    }
+
+    // 聊天消息：有待发附件时先上传，拿到 file_id 再发送
+    let metas: AttachmentMeta[] | undefined;
+    if (this.attach.pendingCount > 0) {
+      const sessionId = this.ws.sessionId;
+      if (!sessionId) {
+        this.log.append({
+          id: `att-${Date.now()}`,
+          time: this._now(),
+          type: 'error',
+          text: '会话未建立，无法上传附件，请稍后重试',
+        });
+        this._restoreInput(text);
+        return;
+      }
+      const uploaded = await this.attach.uploadAll(sessionId);
+      if (!uploaded) {
+        // 上传失败（错误已推送日志），还原文本方便重试
+        this._restoreInput(text);
+        return;
+      }
+      metas = uploaded;
+    }
+
+    this.log.append({
+      id: `cmd-${Date.now()}`,
+      time: this._now(),
+      type,
+      source: '指挥官',
+      text,
+      attachments: metas,
     });
+    this.ws.sendChat(text, metas);
+  }
+
+  /** 还原文本到命令输入框（上传失败时避免丢用户输入） */
+  private _restoreInput(text: string): void {
+    const input = document.getElementById('command-input');
+    if (input instanceof HTMLInputElement && text) input.value = text;
   }
 
   // ─── WS 事件 → UI ────────────────────────────────────

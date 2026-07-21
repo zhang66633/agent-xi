@@ -36,6 +36,8 @@ async def handle_ws_chat(
     协议：
     客户端 → 服务端：
       {"type": "chat", "content": "你好"}
+      {"type": "chat", "content": "看看这个", "attachments": [
+          {"file_id": "abc123", "name": "a.png", "size": 1024, "mime": "image/png"}]}
       {"type": "confirm_tool", "tool_id": "xxx", "allowed": true}
       {"type": "command", "content": "/clear"}
 
@@ -121,7 +123,10 @@ async def handle_ws_chat(
             # ─── 对话消息 ───
             if msg_type == "chat":
                 content = msg.get("content", "").strip()
-                if not content:
+                raw_attachments = msg.get("attachments")
+                attachments = raw_attachments if isinstance(raw_attachments, list) else []
+
+                if not content and not attachments:
                     continue
 
                 # 检查是否是斜杠命令
@@ -137,6 +142,11 @@ async def handle_ws_chat(
                         "message": "会话未初始化",
                     })
                     continue
+
+                # 附件上下文注入（校验 file_id 存在 → 拼入用户消息）
+                attach_ctx = _build_attachment_context(session.id, attachments)
+                if attach_ctx:
+                    content = f"{content}\n\n{attach_ctx}" if content else attach_ctx
 
                 # 流式调用 Brain，逐事件推送
                 try:
@@ -178,6 +188,39 @@ async def _extract_on_close(brain: Any) -> None:
             logger.info("会话结束提取：%d 条新记忆", len(extracted))
     except Exception:
         logger.exception("会话结束记忆提取失败")
+
+
+def _build_attachment_context(session_id: str, attachments: list) -> str:
+    """校验附件并构建上下文注入文本（拼入用户消息交给 Brain）。
+
+    - file_id 不存在于会话上传目录的附件直接跳过（记 warning）
+    - 图片：说明路径 + 暂不支持图片理解
+    - 其他文件：说明路径 + 可用 read_file 工具查看
+    """
+    from .uploads import resolve_attachment
+
+    lines: list[str] = []
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        file_id = str(att.get("file_id", ""))
+        info = resolve_attachment(session_id, file_id)
+        if not info:
+            logger.warning("附件不存在，已跳过: file_id=%s", file_id)
+            continue
+        name = att.get("name") or info["name"]
+        mime = str(att.get("mime") or info["mime"])
+        if mime.startswith("image/"):
+            lines.append(
+                f"[附件] 用户上传了图片 {name}（路径 {info['path']}），"
+                "当前暂不支持图片理解，请告知用户图片已保存但暂无法识别内容。"
+            )
+        else:
+            lines.append(
+                f"[附件] 用户上传了文件 {name}（路径 {info['path']}），"
+                "可用 read_file 工具查看内容。"
+            )
+    return "\n".join(lines)
 
 
 def _event_to_ws_message(event: Any) -> dict[str, Any] | None:
