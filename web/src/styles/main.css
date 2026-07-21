@@ -1209,6 +1209,9 @@ button,
   opacity: 0;
   transition: opacity 0.18s steps(4);
 }
+/* 关键：display:flex 会盖掉 [hidden] 默认的 display:none，
+   不补这条，关闭态的透明遮罩会挡住全页面鼠标事件 */
+.modal-overlay[hidden] { display: none; }
 .modal-overlay.visible { opacity: 1; }
 
 /* ─── 对话框（木框 + 金边双框 + 阶梯阴影）──────────────── */
