@@ -8,8 +8,8 @@ export type AgentState = 'active' | 'running' | 'idle' | 'error';
 /** 智能体（冒险者） */
 export interface Agent {
   id: string;
-  name: string;            // 显示名（如 "艾芙"）
-  role: string;            // 职业（如 "协调者"）
+  name: string;            // 显示名（如 "Xi"）
+  role: string;            // 职业（如 "智能体"）
   level: number;           // 等级
   state: AgentState;
   en: number;              // 能量值 0~100
@@ -37,7 +37,7 @@ export interface LogEntry {
   id: string;
   time: string;            // HH:MM 格式
   type: LogType;
-  source?: string;         // 来源智能体名（如 "艾芙"）
+  source?: string;         // 来源智能体名（如 "Xi"）
   text: string;
   attachments?: AttachmentMeta[];  // 用户消息附带的附件
 }

@@ -10,7 +10,6 @@
  *
  * 数据映射：
  *   Xi 智能体（id='xi'）由后端 memory stats 实时驱动
- *   其他演示智能体保留为"模拟"（后端不支持多智能体）
  *   工具调用动态生成任务条目
  */
 import { WsClient } from './net/ws_client';
@@ -30,16 +29,6 @@ import type { Agent, AttachmentMeta, LogEntry, Quest, LogType } from './types';
 
 // 后端轮询间隔
 const POLL_INTERVAL = 15_000;
-
-// 演示智能体（后端不支持多智能体，其余为模拟）
-const DEMO_AGENTS: Agent[] = [
-  { id: 'aife', name: '艾芙', role: '协调者', level: 15, state: 'active', en: 78, hearts: 8, emoji: '艾', currentTask: '统筹调度子智能体', totalTasks: 247 },
-  { id: 'xingchen', name: '星辰', role: '分析师', level: 12, state: 'running', en: 45, hearts: 7, emoji: '星', currentTask: '批次_07 异常数据分析', totalTasks: 156 },
-  { id: 'liefeng', name: '猎风', role: '探查者', level: 9, state: 'active', en: 90, hearts: 6, emoji: '猎', currentTask: '扫描 192.168.0.0/24', totalTasks: 89 },
-  { id: 'nuanguang', name: '暖光', role: '信使', level: 6, state: 'idle', en: 100, hearts: 9, emoji: '暖', currentTask: '待命', totalTasks: 42 },
-  { id: 'tiechui', name: '铁锤', role: '执行者', level: 11, state: 'error', en: 12, hearts: 5, emoji: '铁', currentTask: '连接超时 #4402', totalTasks: 178 },
-  { id: 'mojuan', name: '墨卷', role: '记录者', level: 20, state: 'active', en: 66, hearts: 10, emoji: '墨', currentTask: '会话事件归档', totalTasks: 412 },
-];
 
 export class App {
   private ws!: WsClient;
@@ -127,7 +116,7 @@ export class App {
       if (view === 'settings') void this.settings.refresh();
     });
 
-    // 启动：先放 Xi 占位 + 演示智能体，再尝试连后端
+    // 启动：先放 Xi 占位，再尝试连后端
     this._initRoster();
 
     // 启动消息
@@ -162,7 +151,7 @@ export class App {
       state: 'idle', en: 0, hearts: 1, emoji: '✦',
       currentTask: '连接中...', totalTasks: 0,
     };
-    this.roster.setAgents([xiPlaceholder, ...DEMO_AGENTS]);
+    this.roster.setAgents([xiPlaceholder]);
     this.roster.select('xi');
     this.status.setCounts(this.roster.getStatusCounts());
   }
@@ -216,21 +205,15 @@ export class App {
       }
 
       if (agent.id === 'xi') {
-        // Xi 显示真实数据
         this._renderXiDetail(agent);
       } else {
-        // 演示智能体
         this.detail.renderAgent(agent);
-        this.detail.renderQuests(this._genDemoQuests(agent));
+        this.detail.renderQuests([]);
       }
     });
 
-    this.detail.onTalk((agent) => {
+    this.detail.onTalk(() => {
       this.cmd.focus();
-      const input = document.getElementById('command-input');
-      if (input instanceof HTMLInputElement) {
-        input.value = agent.id === 'xi' ? '' : `@${agent.name} `;
-      }
     });
   }
 
@@ -504,13 +487,5 @@ export class App {
   private _now(): string {
     const d = new Date();
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-
-  private _genDemoQuests(agent: Agent): Quest[] {
-    return [
-      { id: `${agent.id}-q1`, name: `${agent.role}日常`, stars: 3, state: 'running', assignee: agent.name, reward: '◆×5', progress: 63 },
-      { id: `${agent.id}-q2`, name: '深度任务', stars: 4, state: 'pending', assignee: agent.name, reward: '◆×3', progress: 0 },
-      { id: `${agent.id}-q3`, name: '归档', stars: 2, state: 'done', assignee: agent.name, reward: '◆×2', progress: 100 },
-    ];
   }
 }
