@@ -16,6 +16,7 @@
 import { WsClient } from './net/ws_client';
 import { api, mapXiAgent, toolCallToQuest, type ToolInfo, type SkillInfo } from './net/api';
 import { WS_URL, CONSOLE_VERSION, CONSOLE_CONTEXT } from './config';
+import { Router, type ViewId } from './router';
 import { RosterPanel } from './ui/roster';
 import { LogPanel } from './ui/log';
 import { DetailPanel } from './ui/detail';
@@ -39,6 +40,7 @@ const DEMO_AGENTS: Agent[] = [
 
 export class App {
   private ws!: WsClient;
+  private router!: Router;
   private roster!: RosterPanel;
   private log!: LogPanel;
   private detail!: DetailPanel;
@@ -59,6 +61,11 @@ export class App {
     this.ws = new WsClient(WS_URL);
     this.confirmDialog = new ToolConfirmDialog(this.ws);
     this.ws.connect();
+
+    // 初始化路由（hash 视图切换）
+    this.router = new Router();
+    this.router.start();
+    this._bindNav();
 
     // 初始化 UI
     this.roster = new RosterPanel();
@@ -91,13 +98,14 @@ export class App {
     this.pollTimer = setInterval(() => this._pollBackend(), POLL_INTERVAL);
   }
 
-  /** 释放资源（清定时器 / 断 WS），防止 HMR 叠加实例 */
+  /** 释放资源（清定时器 / 断 WS / 卸路由监听），防止 HMR 叠加实例 */
   destroy(): void {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
     this.status?.stop();
+    this.router?.destroy();
     this.ws?.disconnect();
   }
 
@@ -372,6 +380,16 @@ export class App {
         this.roster.upsertAgent({ ...xi, state: 'idle', currentTask: '重连中' });
       }
       this.status.setCounts(this.roster.getStatusCounts());
+    });
+  }
+
+  // ─── 图标导航 ─────────────────────────────────────────
+  private _bindNav(): void {
+    document.querySelectorAll<HTMLElement>('.nav-icon').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const view = btn.getAttribute('data-view') as ViewId | null;
+        if (view) this.router.navigate(view);
+      });
     });
   }
 

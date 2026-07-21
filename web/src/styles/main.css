@@ -123,9 +123,18 @@ html, body {
   width: 100%; height: 100%;
   display: grid;
   grid-template-rows: 48px 1fr 28px;
+  grid-template-columns: 48px 1fr;
+  grid-template-areas:
+    "top    top"
+    "nav    views"
+    "bottom bottom";
   background: var(--wood-darkest);
   overflow: hidden;
 }
+#top-bar { grid-area: top; }
+#icon-nav { grid-area: nav; }
+#view-container { grid-area: views; }
+#bottom-bar { grid-area: bottom; }
 
 /* ═══ Top Bar ════════════════════════════════════════════ */
 #top-bar {
@@ -1405,4 +1414,125 @@ button,
 .btn-deny {
   background: var(--c-error);
   color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   视图系统 — 图标导航 + Hash 路由视图切换（P1）
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── 图标导航栏（左侧竖排）────────────────────────────── */
+#icon-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  background: linear-gradient(180deg, var(--wood-warm) 0%, var(--wood-dark) 100%);
+  border-right: 3px solid var(--wood-darkest);
+  box-shadow:
+    inset -2px 0 0 rgba(0, 0, 0, 0.4),
+    inset 2px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.nav-icon {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  background: var(--wood-mid);
+  border: 2px solid var(--wood-darkest);
+  border-radius: 0;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.1),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+  transition: all var(--transition);
+}
+.nav-icon svg { display: block; }
+
+.nav-icon:hover {
+  color: var(--gold-bright);
+  background: var(--wood-warm);
+  transform: translate(-1px, -1px);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.15),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    3px 3px 0 rgba(0, 0, 0, 0.6);
+}
+.nav-icon:active {
+  transform: translate(2px, 2px);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+/* 选中态：凹陷 + 金色光环 */
+.nav-icon.active {
+  color: var(--gold-bright);
+  background: var(--wood-darkest);
+  border-color: var(--gold-deep);
+  box-shadow:
+    inset 0 0 0 1px var(--gold-deep),
+    inset 2px 2px 0 rgba(0, 0, 0, 0.6),
+    0 0 6px rgba(244, 208, 63, 0.25);
+}
+
+/* ─── 视图容器（所有视图叠放同一格，切换时重叠过渡）─────── */
+#view-container {
+  display: grid;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.view-section {
+  grid-area: 1 / 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* [hidden] 护栏：任何 display 规则都不得覆盖 UA 默认 none */
+[hidden] { display: none !important; }
+
+/* 控制台视图内的三栏需要撑满高度 */
+#body-area { height: 100%; }
+
+/* ─── 视图切换动画（像素步进感）────────────────────────── */
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes view-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-4px); }
+}
+.view-enter { animation: view-enter 0.15s steps(3) both; }
+.view-exit  { animation: view-exit  0.15s steps(3) both; }
+
+/* ─── 空视图占位 ──────────────────────────────────────── */
+.view-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--wood-dark);
+}
+.placeholder-icon {
+  font-size: 36px;
+  color: var(--wood-pale);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+.placeholder-text {
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--text-light);
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+/* ─── 减少动态效果偏好 ────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .view-enter, .view-exit { animation: none; }
 }

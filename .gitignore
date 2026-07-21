@@ -22,8 +22,9 @@ venv/
 .agent_xi/
 .data/
 
-# 计划文件
+# 计划文件（本地文档，不入库）
 PROJECT.md
+WEB_V2_PLAN.md
 pixel-ui-plan.md
 teach.md
 

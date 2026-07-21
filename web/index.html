@@ -25,37 +25,73 @@
       </div>
     </header>
 
-    <!-- ═══ 主体三栏 ═════════════════════════════════════════ -->
-    <div id="body-area">
-      <!-- ─── 左栏 · 冒险者名册 ─── -->
-      <aside id="roster-panel">
-        <div class="panel-title">✦ 冒险者名册</div>
-        <div id="roster-list"></div>
-      </aside>
+    <!-- ═══ 左侧图标导航栏 ═════════════════════════════════════ -->
+    <nav id="icon-nav">
+      <button class="nav-icon active" data-view="console" title="控制台">
+        <svg viewBox="0 0 16 16" width="20" height="20"><path d="M2 3h12v8H2z M4 13h8v1H4z" fill="currentColor"/><path d="M4 5l2 2-2 2M8 9h3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      </button>
+      <button class="nav-icon" data-view="market" title="商店">
+        <svg viewBox="0 0 16 16" width="20" height="20"><path d="M3 5h10l1 3v5H2V8l1-3z M5 5V3h6v2" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="5" cy="14" r="1" fill="currentColor"/><circle cx="11" cy="14" r="1" fill="currentColor"/></svg>
+      </button>
+      <button class="nav-icon" data-view="settings" title="设置">
+        <svg viewBox="0 0 16 16" width="20" height="20"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M13 3l-1.5 1.5M4.5 11.5L3 13" stroke="currentColor" stroke-width="1.2"/></svg>
+      </button>
+    </nav>
 
-      <!-- ─── 中栏 · 系统日志 + 命令 ─── -->
-      <main id="log-panel">
-        <div class="panel-title">✦ 系统日志</div>
-        <div id="log-list"></div>
+    <!-- ═══ 视图区域 ═════════════════════════════════════════ -->
+    <div id="view-container">
 
-        <div id="command-bar">
-          <span class="cmd-prompt">▶</span>
-          <input id="command-input" type="text" placeholder="输入指令..." autocomplete="off" />
-          <button id="command-exec" class="btn-exec">执行</button>
+      <!-- ─── 控制台视图（默认）─── -->
+      <section id="view-console" class="view-section">
+        <div id="body-area">
+          <!-- 左栏 · 冒险者名册 -->
+          <aside id="roster-panel">
+            <div class="panel-title">✦ 冒险者名册</div>
+            <div id="roster-list"></div>
+          </aside>
+
+          <!-- 中栏 · 系统日志 + 命令 -->
+          <main id="log-panel">
+            <div class="panel-title">✦ 系统日志</div>
+            <div id="log-list"></div>
+
+            <div id="command-bar">
+              <span class="cmd-prompt">▶</span>
+              <input id="command-input" type="text" placeholder="输入指令..." autocomplete="off" />
+              <button id="command-exec" class="btn-exec">执行</button>
+            </div>
+            <div id="command-help">
+              帮助 · 状态 [名称] · 重启 [名称] · 清空
+            </div>
+          </main>
+
+          <!-- 右栏 · 冒险者详情 + 任务公告板 -->
+          <aside id="detail-panel">
+            <div class="panel-title">✦ 冒险者详情</div>
+            <div id="detail-content"></div>
+
+            <div class="panel-title quest-title">✦ 任务公告板</div>
+            <div id="quest-list"></div>
+          </aside>
         </div>
-        <div id="command-help">
-          帮助 · 状态 [名称] · 重启 [名称] · 清空
+      </section>
+
+      <!-- ─── 商店视图 ─── -->
+      <section id="view-market" class="view-section" hidden>
+        <div class="view-placeholder">
+          <div class="placeholder-icon">▣</div>
+          <div class="placeholder-text">商店 · 即将开放</div>
         </div>
-      </main>
+      </section>
 
-      <!-- ─── 右栏 · 冒险者详情 + 任务公告板 ─── -->
-      <aside id="detail-panel">
-        <div class="panel-title">✦ 冒险者详情</div>
-        <div id="detail-content"></div>
+      <!-- ─── 设置视图 ─── -->
+      <section id="view-settings" class="view-section" hidden>
+        <div class="view-placeholder">
+          <div class="placeholder-icon">✧</div>
+          <div class="placeholder-text">设置 · 即将开放</div>
+        </div>
+      </section>
 
-        <div class="panel-title quest-title">✦ 任务公告板</div>
-        <div id="quest-list"></div>
-      </aside>
     </div>
 
     <!-- ═══ 底部状态栏 ═══════════════════════════════════════ -->
