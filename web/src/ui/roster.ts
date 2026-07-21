@@ -78,18 +78,29 @@ export class RosterPanel {
       const hearts = '♥'.repeat(agent.hearts);
 
       card.innerHTML = `
-        <div class="agent-avatar">${agent.avatar ? `<img src="${agent.avatar}" alt="${agent.name}">` : (agent.emoji ?? agent.name.charAt(0))}</div>
+        <div class="agent-avatar"></div>
         <div class="agent-head">
-          <span class="agent-name">${agent.name}</span>
+          <span class="agent-name">${this._escape(agent.name)}</span>
           <span class="agent-state state-${agent.state}">${this._stateText(agent.state)}</span>
         </div>
-        <div class="agent-role">${agent.role} · Lv.${agent.level}</div>
+        <div class="agent-role">${this._escape(agent.role)} · Lv.${agent.level}</div>
         <div class="agent-stats">
           <span class="agent-en-label">EN</span>
           <span class="agent-en-value">${agent.en}</span>
           <span class="agent-hearts" title="友好度 ${agent.hearts}/10">${hearts}</span>
         </div>
       `;
+
+      // 头像：DOM API 赋值 + 协议白名单，避免 src 属性注入
+      const avatarEl = card.querySelector('.agent-avatar')!;
+      if (agent.avatar && /^https?:\/\//i.test(agent.avatar)) {
+        const img = document.createElement('img');
+        img.src = agent.avatar;
+        img.alt = agent.name;
+        avatarEl.appendChild(img);
+      } else {
+        avatarEl.textContent = agent.emoji ?? agent.name.charAt(0);
+      }
 
       card.addEventListener('click', () => this.select(agent.id));
       this.listEl.appendChild(card);
@@ -102,6 +113,16 @@ export class RosterPanel {
 
   private _stateText(s: AgentState): string {
     return { active: '活跃', running: '执行中', idle: '待机', error: '故障' }[s];
+  }
+
+  /** HTML 转义 */
+  private _escape(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   private _emitSelected(): void {

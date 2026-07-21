@@ -35,6 +35,7 @@ export class WsClient {
   private handlers: Map<string, Set<EventHandler>> = new Map();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectAttempts = 0;
   private _connected = false;
 
   constructor(private url: string) {}
@@ -52,6 +53,7 @@ export class WsClient {
 
     this.ws.onopen = () => {
       this._connected = true;
+      this.reconnectAttempts = 0;
       this._emit('connected', { type: 'connected' });
       this._startHeartbeat();
     };
@@ -87,6 +89,7 @@ export class WsClient {
     this.ws?.close();
     this.ws = null;
     this._connected = false;
+    this.reconnectAttempts = 0;
   }
 
   /** 发送聊天消息 */
@@ -148,9 +151,12 @@ export class WsClient {
 
   private _scheduleReconnect(): void {
     if (this.reconnectTimer) return;
+    // 指数退避：3s → 6s → 12s …… 上限 60s
+    const delay = Math.min(3000 * 2 ** this.reconnectAttempts, 60_000);
+    this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
-    }, 3000);
+    }, delay);
   }
 }

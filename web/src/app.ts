@@ -21,6 +21,7 @@ import { LogPanel } from './ui/log';
 import { DetailPanel } from './ui/detail';
 import { CommandInput, detectCommandType } from './ui/command';
 import { StatusBar } from './ui/statusbar';
+import { ToolConfirmDialog } from './ui/tool_confirm';
 import type { Agent, LogEntry, Quest, LogType } from './types';
 
 // 后端轮询间隔
@@ -43,6 +44,7 @@ export class App {
   private detail!: DetailPanel;
   private cmd!: CommandInput;
   private status!: StatusBar;
+  private confirmDialog!: ToolConfirmDialog;
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private currentAgentId: string | null = null;
@@ -55,6 +57,7 @@ export class App {
   init(): void {
     // 初始化 WS
     this.ws = new WsClient(WS_URL);
+    this.confirmDialog = new ToolConfirmDialog(this.ws);
     this.ws.connect();
 
     // 初始化 UI
@@ -88,6 +91,16 @@ export class App {
     this.pollTimer = setInterval(() => this._pollBackend(), POLL_INTERVAL);
   }
 
+  /** 释放资源（清定时器 / 断 WS），防止 HMR 叠加实例 */
+  destroy(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+    this.status?.stop();
+    this.ws?.disconnect();
+  }
+
   // ─── 名册初始化 ─────────────────────────────────────────
   private _initRoster(): void {
     // Xi 占位（待后端数据填充真实状态）
@@ -103,19 +116,20 @@ export class App {
 
   // ─── 后端轮询 ─────────────────────────────────────────
   private async _pollBackend(): Promise<void> {
-    try {
-      const [health, stats, tools, skills] = await Promise.all([
-        api.health(),
-        api.memoryStats(),
-        api.listTools(),
-        api.listSkills(),
-      ]);
-      this.tools = tools;
-      this.skills = skills;
-      this.backendOnline = (health.status === 'ok');
+    const [health, stats, tools, skills] = await Promise.allSettled([
+      api.health(),
+      api.memoryStats(),
+      api.listTools(),
+      api.listSkills(),
+    ]);
 
+    if (tools.status === 'fulfilled') this.tools = tools.value;
+    if (skills.status === 'fulfilled') this.skills = skills.value;
+    this.backendOnline = health.status === 'fulfilled' && health.value.status === 'ok';
+
+    if (stats.status === 'fulfilled') {
       // 更新 Xi 智能体卡片
-      const xiAgent = mapXiAgent(stats, tools, skills);
+      const xiAgent = mapXiAgent(stats.value, this.tools, this.skills);
       if (this.backendOnline) {
         xiAgent.state = this.currentRunningTool ? 'running' : 'active';
       } else {
@@ -129,9 +143,8 @@ export class App {
       if (this.currentAgentId === 'xi') {
         this._renderXiDetail(xiAgent);
       }
-    } catch {
-      this.backendOnline = false;
-      // 把 Xi 标记为离线
+    } else if (!this.backendOnline) {
+      // stats 和 health 都失败才标记离线
       const xi = this.roster.getSelected();
       if (xi && xi.id === 'xi') {
         this.roster.upsertAgent({ ...xi, state: 'idle', currentTask: '后端未连接' });
@@ -161,8 +174,10 @@ export class App {
 
     this.detail.onTalk((agent) => {
       this.cmd.focus();
-      const input = document.getElementById('command-input') as HTMLInputElement;
-      input.value = agent.id === 'xi' ? '' : `@${agent.name} `;
+      const input = document.getElementById('command-input');
+      if (input instanceof HTMLInputElement) {
+        input.value = agent.id === 'xi' ? '' : `@${agent.name} `;
+      }
     });
   }
 
@@ -286,15 +301,7 @@ export class App {
       this.currentRunningTool = null;
     });
 
-    this.ws.on('tool_confirm_request', (msg) => {
-      const argsStr = msg.args ? JSON.stringify(msg.args).slice(0, 80) : '';
-      this.log.append({
-        id: `conf-${Date.now()}`,
-        time: this._now(),
-        type: 'warn',
-        text: `工具确认: ${msg.tool_name ?? '工具'} ${argsStr}`,
-      });
-    });
+    // tool_confirm_request 由 ToolConfirmDialog 统一处理（弹窗 + sendConfirm 回复）
 
     this.ws.on('tool_denied', (msg) => {
       this.log.append({
@@ -364,9 +371,9 @@ export class App {
 
   private _genDemoQuests(agent: Agent): Quest[] {
     return [
-      { id: `${agent.id}-q1`, name: `${agent.role}日常`, stars: 3, state: 'running', assignee: agent.name, reward: '💎×5', progress: 63 },
-      { id: `${agent.id}-q2`, name: '深度任务', stars: 4, state: 'pending', assignee: agent.name, reward: '💎×3', progress: 0 },
-      { id: `${agent.id}-q3`, name: '归档', stars: 2, state: 'done', assignee: agent.name, reward: '💎×2', progress: 100 },
+      { id: `${agent.id}-q1`, name: `${agent.role}日常`, stars: 3, state: 'running', assignee: agent.name, reward: '◆×5', progress: 63 },
+      { id: `${agent.id}-q2`, name: '深度任务', stars: 4, state: 'pending', assignee: agent.name, reward: '◆×3', progress: 0 },
+      { id: `${agent.id}-q3`, name: '归档', stars: 2, state: 'done', assignee: agent.name, reward: '◆×2', progress: 100 },
     ];
   }
 }

@@ -14,8 +14,13 @@ export class CommandInput {
   private historyIdx = -1;
 
   constructor() {
-    this.inputEl = document.getElementById('command-input') as HTMLInputElement;
-    this.execBtn = document.getElementById('command-exec') as HTMLButtonElement;
+    const inputEl = document.getElementById('command-input');
+    const execBtn = document.getElementById('command-exec');
+    if (!(inputEl instanceof HTMLInputElement) || !(execBtn instanceof HTMLButtonElement)) {
+      throw new Error('[CommandInput] 缺少 #command-input 或 #command-exec 元素');
+    }
+    this.inputEl = inputEl;
+    this.execBtn = execBtn;
     this._bind();
   }
 

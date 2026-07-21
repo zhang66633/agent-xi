@@ -15,12 +15,12 @@ export class StatusBar {
   private clockTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    this.onlineEl = document.getElementById('cnt-online')!;
-    this.idleEl = document.getElementById('cnt-idle')!;
-    this.errorEl = document.getElementById('cnt-error')!;
-    this.seasonEl = document.getElementById('season-text')!;
-    this.clockEl = document.getElementById('clock-text')!;
-    this.bottomCtxEl = document.getElementById('bottom-context')!;
+    this.onlineEl = this._req('cnt-online');
+    this.idleEl = this._req('cnt-idle');
+    this.errorEl = this._req('cnt-error');
+    this.seasonEl = this._req('season-text');
+    this.clockEl = this._req('clock-text');
+    this.bottomCtxEl = this._req('bottom-context');
   }
 
   start(): void {
@@ -53,6 +53,12 @@ export class StatusBar {
   }
 
   // ─── 内部 ─────────────────────────────────────────────
+  private _req(id: string): HTMLElement {
+    const el = document.getElementById(id);
+    if (!el) throw new Error(`[StatusBar] 缺少 #${id} 元素`);
+    return el;
+  }
+
   private _tickClock(): void {
     const d = new Date();
     const hh = String(d.getHours()).padStart(2, '0');

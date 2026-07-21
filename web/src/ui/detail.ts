@@ -49,8 +49,8 @@ export class DetailPanel {
     const hearts = '♥'.repeat(agent.hearts);
 
     this.contentEl.innerHTML = `
-      <div class="detail-name">${agent.name}</div>
-      <div class="detail-role">${agent.role} · Lv.${agent.level}</div>
+      <div class="detail-name">${this._escape(agent.name)}</div>
+      <div class="detail-role">${this._escape(agent.role)} · Lv.${agent.level}</div>
       <div class="detail-state-row">
         <span class="agent-state state-${agent.state}">${this._stateText(agent.state)}</span>
       </div>
@@ -64,7 +64,7 @@ export class DetailPanel {
       </div>
       <div class="detail-stat">
         <span class="stat-label">当前任务</span>
-        <span class="stat-value">${agent.currentTask ?? '—'}</span>
+        <span class="stat-value">${this._escape(agent.currentTask ?? '—')}</span>
       </div>
       <div class="detail-stat">
         <span class="stat-label">累计任务</span>
@@ -103,11 +103,11 @@ export class DetailPanel {
       card.innerHTML = `
         <div class="quest-head">
           <span class="quest-stars">${stars}</span>
-          <span class="quest-name">${q.name}</span>
+          <span class="quest-name">${this._escape(q.name)}</span>
           <span class="quest-state q-${q.state}">${QUEST_STATE_LABEL[q.state]}</span>
         </div>
         <div class="quest-meta">
-          <span>负责人: ${q.assignee} ${q.reward}</span>
+          <span>负责人: ${this._escape(q.assignee)} ${this._escape(q.reward)}</span>
           <span>${q.progress}%</span>
         </div>
         <div class="quest-progress">
@@ -135,8 +135,8 @@ export class DetailPanel {
         const secLabel = SECURITY_LABEL[t.security_level] ?? t.security_level;
         html += `
           <div class="extras-item">
-            <span class="extras-name">${t.name}</span>
-            <span class="sec-badge ${secClass}">${secLabel}</span>
+            <span class="extras-name">${this._escape(t.name)}</span>
+            <span class="sec-badge ${secClass}">${this._escape(secLabel)}</span>
           </div>
         `;
       });
@@ -150,7 +150,7 @@ export class DetailPanel {
       skills.forEach((s) => {
         html += `
           <div class="extras-item">
-            <span class="extras-name">${s.name}</span>
+            <span class="extras-name">${this._escape(s.name)}</span>
             <span class="extras-count">×${s.use_count}</span>
           </div>
         `;
@@ -181,5 +181,15 @@ export class DetailPanel {
 
   private _stateText(s: Agent['state']): string {
     return { active: '活跃', running: '执行中', idle: '待机', error: '故障' }[s];
+  }
+
+  /** HTML 转义（后端/WS 数据一律过这里再进 innerHTML） */
+  private _escape(s: string): string {
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }

@@ -30,9 +30,15 @@ export interface HealthInfo {
 
 class ApiClient {
   private async _get<T>(path: string): Promise<T> {
-    const res = await fetch(`${API_BASE}${path}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    return res.json() as Promise<T>;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8_000);
+    try {
+      const res = await fetch(`${API_BASE}${path}`, { signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      return res.json() as Promise<T>;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async health(): Promise<HealthInfo> {
@@ -95,7 +101,7 @@ export function toolCallToQuest(
     stars: 2,
     state,
     assignee: 'Xi',
-    reward: '💎×1',
+    reward: '◆×1',
     progress,
   };
 }
