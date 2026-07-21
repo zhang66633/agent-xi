@@ -17,6 +17,7 @@ venv/
 
 # 项目数据
 .firecrawl/
+.codebuddy/
 
 # 记忆文件（运行时生成）
 .agent_xi/
