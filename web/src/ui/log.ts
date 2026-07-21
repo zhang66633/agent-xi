@@ -93,11 +93,14 @@ export class LogPanel {
     row.className = `log-row log-${entry.type}`;
     row.dataset.id = entry.id;
 
-    const sourcePrefix = entry.source ? `${entry.source} ` : '';
+    const sourceHtml = entry.source
+      ? `<span class="log-source">${this._escape(entry.source)}</span>`
+      : '';
     row.innerHTML = `
       <span class="log-time">${entry.time}</span>
       <span class="log-type log-type-${entry.type}">${TYPE_LABEL[entry.type]}</span>
-      <span class="log-text">${this._renderRichText(sourcePrefix + entry.text)}</span>
+      ${sourceHtml}
+      <span class="log-text">${this._renderRichText(entry.text)}</span>
     `;
 
     if (entry.attachments && entry.attachments.length > 0) {
@@ -250,6 +253,20 @@ export class LogPanel {
         continue;
       }
 
+      // 表格：当前行含 |，下一行是分隔行（|---|---|）
+      if (t.includes('|') && i + 1 < lines.length && this._isTableSep(lines[i + 1].trim())) {
+        flushPara();
+        const header = this._splitTableRow(t);
+        i += 2; // 跳过表头 + 分隔行
+        const rows: string[][] = [];
+        while (i < lines.length && lines[i].trim().includes('|')) {
+          rows.push(this._splitTableRow(lines[i].trim()));
+          i++;
+        }
+        blocks.push(this._renderTable(header, rows));
+        continue;
+      }
+
       // 有序列表 1. / 1)
       if (/^\d+[.)]\s+/.test(t)) {
         flushPara();
@@ -277,6 +294,35 @@ export class LogPanel {
     }
     flushPara();
     return blocks.join('');
+  }
+
+  /** 判断是否为表格分隔行（|---|:---:| 形式） */
+  private _isTableSep(s: string): boolean {
+    return s.includes('|') && s.includes('-') && /^[\s|:\-]+$/.test(s);
+  }
+
+  /** 拆分表格行：去掉首尾 | 后按 | 切分 */
+  private _splitTableRow(line: string): string[] {
+    let s = line.trim();
+    if (s.startsWith('|')) s = s.slice(1);
+    if (s.endsWith('|')) s = s.slice(0, -1);
+    return s.split('|').map((c) => c.trim());
+  }
+
+  /** 渲染表格为 span 结构（display:table 布局） */
+  private _renderTable(header: string[], rows: string[][]): string {
+    const headRow = `<span class="md-tr md-tr-head">${header
+      .map((c) => `<span class="md-td">${this._inline(this._escape(c))}</span>`)
+      .join('')}</span>`;
+    const bodyRows = rows
+      .map(
+        (r) =>
+          `<span class="md-tr">${r
+            .map((c) => `<span class="md-td">${this._inline(this._escape(c))}</span>`)
+            .join('')}</span>`,
+      )
+      .join('');
+    return `<span class="md-table">${headRow}${bodyRows}</span>`;
   }
 
   /** 行内格式（输入已转义）：行内代码 / 粗体 / 斜体 / 链接 */
