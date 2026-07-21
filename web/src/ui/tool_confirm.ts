@@ -30,7 +30,7 @@ export class ToolConfirmDialog {
       : '（无参数）';
 
     const body = `
-      <div class="confirm-warning">⚠ 工具请求执行权限</div>
+      <div class="confirm-warning">▲ 工具请求执行权限</div>
       <div class="confirm-tool-name">${this._escape(toolName)}</div>
       <div class="quest-detail-section">
         <div class="qd-section-title">参数</div>

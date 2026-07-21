@@ -68,6 +68,9 @@ html, body {
   color: var(--text-on-dark);
   background: var(--wood-darkest);
   -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
   image-rendering: pixelated;
 }
 
@@ -253,7 +256,7 @@ html, body {
 .agent-card:hover {
   background: var(--wood-warm);
   border-color: var(--gold-deep);
-  transform: translateX(2px);
+  transform: translate(-2px, -2px);
 }
 
 .agent-card.selected {
@@ -1054,3 +1057,349 @@ html, body {
 #roster-panel::after { bottom: 4px; right: 4px; }
 #detail-panel::before { top: 4px; left: 4px; }
 #detail-panel::after { bottom: 4px; left: 4px; }
+
+/* ═══════════════════════════════════════════════════════════
+   像素风强化 v3 — CRT 滤镜 / 像素光标 / 防模糊 / hover 位移
+   （教程映射：扫描线+闪烁、image-rendering 三件套、SVG 光标、
+     text-rendering 几何精度、按钮卡片硬阴影位移）
+   放在文件末尾以压过 v2 覆盖层
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── image-rendering 三件套（位图元素全局兜底）────────── */
+img, canvas, video {
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+/* ─── 像素字体防模糊（几何精度渲染，禁亚像素抗锯齿）────── */
+.pixel-text,
+.brand,
+.panel-title,
+.agent-name,
+.agent-role,
+.agent-state,
+.agent-en-label,
+.agent-en-value,
+.agent-hearts,
+.detail-name,
+.detail-role,
+.detail-stat .stat-label,
+.detail-stat .stat-value,
+.detail-empty,
+.status-pill,
+.season,
+.clock,
+.log-time,
+.log-type,
+.cmd-prompt,
+#command-help,
+#bottom-bar,
+.btn-exec,
+.btn-talk,
+.quest-name,
+.quest-stars,
+.quest-state,
+.quest-meta,
+.extras-title,
+.extras-count,
+.sec-badge {
+  text-rendering: geometricPrecision;
+}
+
+/* ─── CRT 扫描线 + 暗角 + 微闪烁 ──────────────────────── */
+#app { position: relative; }
+#app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background:
+    /* 扫描线：1px 黑线 / 2px 透明，模拟 CRT 栅格 */
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.12) 0px,
+      rgba(0, 0, 0, 0.12) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    /* 暗角：四角轻微压暗，聚焦中心 */
+    radial-gradient(ellipse at center, transparent 62%, rgba(0, 0, 0, 0.22) 100%);
+  animation: crt-flicker 4s steps(60) infinite;
+}
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.96; }
+}
+/* 尊重系统"减少动态效果"偏好 */
+@media (prefers-reduced-motion: reduce) {
+  #app::after { animation: none; }
+}
+
+/* ─── 像素光标（SVG data-URI 阶梯箭头，热点在箭尖）─────── */
+body {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' shape-rendering='crispEdges'%3E%3Cpath d='M2 2v17h3v-3h3v-3h3v-3h3v-3h3V2z' fill='%23FFFDF5' stroke='%231A0F06' stroke-width='2'/%3E%3C/svg%3E") 2 2, auto;
+}
+button,
+.agent-card,
+.btn-exec,
+.btn-talk,
+.modal-close {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' shape-rendering='crispEdges'%3E%3Cpath d='M2 2v17h3v-3h3v-3h3v-3h3v-3h3V2z' fill='%23F4D03F' stroke='%231A0F06' stroke-width='2'/%3E%3C/svg%3E") 2 2, pointer;
+}
+
+/* ─── hover 像素位移（抬起感：左上偏移 + 加硬阴影）────── */
+.agent-card:hover {
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.18),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.5),
+    4px 4px 0 #000,
+    5px 5px 0 #000,
+    6px 6px 0 rgba(0, 0, 0, 0.6);
+}
+/* 选中态 hover 保留金色光环 */
+.agent-card.selected:hover {
+  box-shadow:
+    inset 0 0 0 2px var(--gold-bright),
+    inset 2px 2px 0 rgba(255, 255, 255, 0.25),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(244, 208, 63, 0.5),
+    4px 4px 0 #000,
+    5px 5px 0 #000;
+}
+/* 卡片按压（必须在 hover 之后，hover 与 active 同时生效时压过 hover）*/
+.agent-card:active {
+  transform: translate(2px, 2px);
+  box-shadow:
+    inset 2px 2px 0 rgba(0, 0, 0, 0.4),
+    1px 1px 0 #000;
+}
+
+.btn-exec:hover,
+.btn-talk:hover {
+  filter: brightness(1.1);
+  transform: translate(-2px, -2px);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.4),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.3),
+    4px 4px 0 #000,
+    5px 5px 0 rgba(0, 0, 0, 0.6);
+}
+/* 按钮按压（同上，重声明以压过 hover）*/
+.btn-exec:active,
+.btn-talk:active {
+  transform: translate(3px, 3px);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Modal 像素弹窗 — modal.ts / ToolConfirmDialog
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── 遮罩层（暗色 + 淡入）────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;   /* 低于 CRT 覆盖层(9999)：扫描线盖住弹窗更像实机 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 7, 2, 0.72);
+  opacity: 0;
+  transition: opacity 0.18s steps(4);
+}
+.modal-overlay.visible { opacity: 1; }
+
+/* ─── 对话框（木框 + 金边双框 + 阶梯阴影）──────────────── */
+.modal-dialog {
+  position: relative;
+  width: 440px;
+  max-width: min(92vw, 560px);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 10px,
+      rgba(0, 0, 0, 0.06) 10px,
+      rgba(0, 0, 0, 0.06) 11px
+    ),
+    var(--wood-mid);
+  /* px-border 已给 3px 深木边框 + 光影，这里外加一圈金色外框 */
+  outline: 2px solid var(--gold-deep);
+  outline-offset: 2px;
+  /* 弹出动画：像素步进感 */
+  opacity: 0;
+  transform: translateY(10px) scale(0.94);
+  transition: opacity 0.18s steps(4), transform 0.18s steps(4);
+}
+.modal-dialog.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ─── 关闭按钮（右上角像素小方块）──────────────────────── */
+.modal-close-wrap {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+}
+.modal-close {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-pixel);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--gold-bright);
+  background: var(--wood-darkest);
+  border: 2px solid var(--gold-deep);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.1),
+    2px 2px 0 #000;
+  transition: all var(--transition);
+}
+.modal-close:hover {
+  background: var(--c-error);
+  color: #fff;
+  transform: translate(-1px, -1px);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.25),
+    3px 3px 0 #000;
+}
+.modal-close:active {
+  transform: translate(2px, 2px);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ─── 标题栏（与 panel-title 同款木纹金边）────────────── */
+.modal-title {
+  padding: 9px 40px 9px 14px;   /* 右侧给关闭按钮让位 */
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--gold-bright);
+  text-shadow: 2px 2px 0 #000;
+  background: linear-gradient(180deg, var(--wood-warm), var(--wood-mid));
+  border-bottom: 3px solid #000;
+  box-shadow:
+    inset 0 2px 0 rgba(244, 208, 63, 0.15),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ─── 内容区 ──────────────────────────────────────────── */
+.modal-body {
+  flex: 1;
+  padding: 14px;
+  overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(245, 230, 200, 0.04), transparent 40%);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* ─── 工具确认：警告横幅 ──────────────────────────────── */
+.confirm-warning {
+  padding: 6px 10px;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-align: center;
+  color: var(--wood-darkest);
+  background: var(--c-warn);
+  border: 2px solid #000;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.4),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.3),
+    2px 2px 0 #000;
+}
+
+/* ─── 工具确认：工具名 ────────────────────────────────── */
+.confirm-tool-name {
+  margin: 12px 0 4px;
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  text-align: center;
+  color: var(--gold-bright);
+  text-shadow: 2px 2px 0 #000;
+  word-break: break-all;
+}
+
+/* ─── 工具确认：参数段落 + 代码块 ─────────────────────── */
+.quest-detail-section { margin-top: 12px; }
+.qd-section-title {
+  margin-bottom: 6px;
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text-light);
+}
+.qd-section-title::before {
+  content: "◆ ";
+  color: var(--gold);
+}
+.qd-code {
+  max-height: 170px;
+  overflow: auto;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--cream);
+  background: var(--wood-darkest);
+  border: 2px solid #000;
+  box-shadow:
+    inset 2px 2px 0 rgba(0, 0, 0, 0.6),
+    inset -1px -1px 0 rgba(244, 208, 63, 0.08);
+}
+
+/* ─── 工具确认：操作按钮行 ────────────────────────────── */
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.btn-confirm {
+  min-width: 88px;
+  padding: 8px 18px;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  letter-spacing: 2px;
+  border: 2px solid #000;
+  cursor: pointer;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.35),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.3),
+    2px 2px 0 #000,
+    3px 3px 0 rgba(0, 0, 0, 0.6);
+  transition: all var(--transition);
+}
+.btn-confirm:hover {
+  transform: translate(-2px, -2px);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.35),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.3),
+    4px 4px 0 #000,
+    5px 5px 0 rgba(0, 0, 0, 0.6);
+}
+.btn-confirm:active {
+  transform: translate(2px, 2px);
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.4);
+}
+.btn-allow {
+  background: var(--c-online);
+  color: var(--wood-darkest);
+}
+.btn-deny {
+  background: var(--c-error);
+  color: #fff;
+}
