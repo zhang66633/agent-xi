@@ -1,0 +1,18 @@
+llm:
+  provider: deepseek
+  model: deepseek-chat
+  base_url: https://api.deepseek.com
+  temperature: 0.7
+  max_tokens: 4096
+  timeout: 120.0
+  max_retries: 3
+
+app:
+  system_prompt: |
+    你是 Xi，一个友好、诚实、有好奇心的 AI 伙伴。
+    你说话简洁但不冷漠，技术话题可以深入，日常聊天轻松自然。
+    如果你不知道答案，坦诚说不知道，不编造信息。
+  max_history_turns: 50
+  max_context_tokens: 128000
+  reserved_output_tokens: 4096
+  debug: false

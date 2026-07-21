@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智能体控制台 · Agent Xi</title>
+  <link rel="stylesheet" href="/src/styles/main.css" />
+  <link rel="preload" href="/fonts/zpix.ttf" as="font" type="font/ttf" crossorigin />
+</head>
+<body>
+  <div id="app">
+    <!-- ═══ 顶部状态栏 ═══════════════════════════════════════ -->
+    <header id="top-bar">
+      <div class="top-left">
+        <span class="brand">✦ 智能体控制台</span>
+      </div>
+      <div class="top-center">
+        <span class="status-pill pill-online">在线 <b id="cnt-online">0</b></span>
+        <span class="status-pill pill-idle">待机 <b id="cnt-idle">0</b></span>
+        <span class="status-pill pill-error">故障 <b id="cnt-error">0</b></span>
+      </div>
+      <div class="top-right">
+        <span class="season" id="season-text">春季 第12天</span>
+        <span class="clock" id="clock-text">10:47</span>
+      </div>
+    </header>
+
+    <!-- ═══ 主体三栏 ═════════════════════════════════════════ -->
+    <div id="body-area">
+      <!-- ─── 左栏 · 冒险者名册 ─── -->
+      <aside id="roster-panel">
+        <div class="panel-title">✦ 冒险者名册</div>
+        <div id="roster-list"></div>
+      </aside>
+
+      <!-- ─── 中栏 · 系统日志 + 命令 ─── -->
+      <main id="log-panel">
+        <div class="panel-title">✦ 系统日志</div>
+        <div id="log-list"></div>
+
+        <div id="command-bar">
+          <span class="cmd-prompt">▶</span>
+          <input id="command-input" type="text" placeholder="输入指令..." autocomplete="off" />
+          <button id="command-exec" class="btn-exec">执行</button>
+        </div>
+        <div id="command-help">
+          帮助 · 状态 [名称] · 重启 [名称] · 清空
+        </div>
+      </main>
+
+      <!-- ─── 右栏 · 冒险者详情 + 任务公告板 ─── -->
+      <aside id="detail-panel">
+        <div class="panel-title">✦ 冒险者详情</div>
+        <div id="detail-content"></div>
+
+        <div class="panel-title quest-title">✦ 任务公告板</div>
+        <div id="quest-list"></div>
+      </aside>
+    </div>
+
+    <!-- ═══ 底部状态栏 ═══════════════════════════════════════ -->
+    <footer id="bottom-bar">
+      <span>◈ 控制台 v2.7 ◈</span>
+      <span id="bottom-context">春季农场 · 第 12 天</span>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

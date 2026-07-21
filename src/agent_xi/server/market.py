@@ -1,0 +1,189 @@
+"""插件市场注册表 — MCP 服务器 + 技能包。
+
+提供可安装项的元数据列表和安装逻辑。
+安装 MCP = 写入 config/mcp.yaml；安装 Skill = 写入 skills 数据库。
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+import yaml
+
+logger = logging.getLogger(__name__)
+
+# ─── MCP 市场 ─────────────────────────────────────────────────
+
+MCP_MARKET: list[dict] = [
+    {
+        "id": "filesystem",
+        "name": "Filesystem",
+        "description": "读写本地文件系统，支持目录浏览、文件搜索",
+        "icon": "📁",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"],
+        "installed": False,
+    },
+    {
+        "id": "github",
+        "name": "GitHub",
+        "description": "操作 GitHub 仓库：PR、Issue、代码搜索",
+        "icon": "🐙",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {"GITHUB_TOKEN": ""},
+        "installed": False,
+    },
+    {
+        "id": "sqlite",
+        "name": "SQLite",
+        "description": "查询 SQLite 数据库，执行 SQL",
+        "icon": "🗄️",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "/path.db"],
+        "installed": False,
+    },
+    {
+        "id": "brave-search",
+        "name": "Brave Search",
+        "description": "网页搜索（Brave Search API）",
+        "icon": "🔍",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+        "env": {"BRAVE_API_KEY": ""},
+        "installed": False,
+    },
+    {
+        "id": "puppeteer",
+        "name": "Puppeteer",
+        "description": "浏览器自动化：截图、点击、表单填写",
+        "icon": "🎭",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+        "installed": False,
+    },
+    {
+        "id": "memory",
+        "name": "Memory Graph",
+        "description": "知识图谱记忆：实体关系存储与检索",
+        "icon": "🧠",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"],
+        "installed": False,
+    },
+]
+
+# ─── 技能市场 ─────────────────────────────────────────────────
+
+SKILL_MARKET: list[dict] = [
+    {
+        "id": "code-review",
+        "name": "代码审查",
+        "description": "自动审查代码质量、安全性、性能问题",
+        "icon": "🔎",
+        "keywords": ["代码", "审查", "review", "质量"],
+        "steps": "1. 读取目标文件\n2. 分析代码结构\n3. 检查常见问题\n4. 输出审查报告",
+        "installed": False,
+    },
+    {
+        "id": "summarize",
+        "name": "文档摘要",
+        "description": "将长文档压缩为结构化摘要",
+        "icon": "📝",
+        "keywords": ["摘要", "总结", "文档", "压缩"],
+        "steps": "1. 读取文档内容\n2. 提取关键信息\n3. 生成结构化摘要\n4. 输出 markdown",
+        "installed": False,
+    },
+    {
+        "id": "translate",
+        "name": "翻译助手",
+        "description": "中英互译，保持专业术语准确",
+        "icon": "🌐",
+        "keywords": ["翻译", "translate", "中文", "英文"],
+        "steps": "1. 识别源语言\n2. 翻译为目标语言\n3. 校验术语一致性\n4. 输出译文",
+        "installed": False,
+    },
+    {
+        "id": "data-analysis",
+        "name": "数据分析",
+        "description": "分析 CSV/JSON 数据，生成统计报告和图表建议",
+        "icon": "📊",
+        "keywords": ["数据", "分析", "统计", "CSV"],
+        "steps": "1. 加载数据文件\n2. 基础统计描述\n3. 发现异常值\n4. 给出可视化建议",
+        "installed": False,
+    },
+]
+
+
+# ─── 安装逻辑 ─────────────────────────────────────────────────
+
+_CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config"
+
+
+def install_mcp(item_id: str) -> dict:
+    """将 MCP 服务器配置写入 config/mcp.yaml。"""
+    item = next((m for m in MCP_MARKET if m["id"] == item_id), None)
+    if not item:
+        return {"ok": False, "error": f"未找到 MCP: {item_id}"}
+
+    mcp_yaml = _CONFIG_DIR / "mcp.yaml"
+
+    # 读取现有配置
+    if mcp_yaml.exists():
+        with open(mcp_yaml, encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+    else:
+        config = {}
+
+    servers = config.setdefault("servers", [])
+
+    # 检查是否已安装
+    if any(s.get("name") == item_id for s in servers):
+        return {"ok": False, "error": f"{item['name']} 已安装"}
+
+    # 写入新服务器配置
+    new_entry = {
+        "name": item_id,
+        "command": item["command"],
+        "args": item["args"],
+    }
+    if "env" in item:
+        new_entry["env"] = item["env"]
+
+    servers.append(new_entry)
+
+    with open(mcp_yaml, "w", encoding="utf-8") as f:
+        yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+
+    item["installed"] = True
+    logger.info("MCP installed: %s", item_id)
+    return {"ok": True, "message": f"{item['name']} 已安装，重启后生效"}
+
+
+def install_skill(item_id: str) -> dict:
+    """将技能写入 skills 数据库。"""
+    item = next((s for s in SKILL_MARKET if s["id"] == item_id), None)
+    if not item:
+        return {"ok": False, "error": f"未找到技能: {item_id}"}
+
+    # 延迟导入避免循环依赖
+    try:
+        from ..skills.store import SkillStore
+        from ..skills.models import Skill
+
+        store = SkillStore()
+        skill = Skill(
+            id=item_id,
+            name=item["name"],
+            description=item["description"],
+            keywords=item["keywords"],
+            steps=item["steps"],
+        )
+        store.save(skill)
+        item["installed"] = True
+        logger.info("Skill installed: %s", item_id)
+        return {"ok": True, "message": f"{item['name']} 已安装"}
+    except Exception as e:
+        logger.error("Skill install failed: %s", e)
+        return {"ok": False, "error": str(e)}
