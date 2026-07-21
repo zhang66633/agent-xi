@@ -29,3 +29,7 @@ teach.md
 # 内存数据
 *.db
 *.sqlite
+
+# Node / 前端
+node_modules/
+.vite/
