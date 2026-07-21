@@ -42,12 +42,12 @@ export class StatusBar {
     this.errorEl.textContent = String(counts.error);
   }
 
-  /** 设置季节文本（如 "春季 第12天"） */
+  /** 设置季节文本（如 "夏季 7月21日"；默认由时钟按真实日期驱动） */
   setSeason(text: string): void {
     this.seasonEl.textContent = text;
   }
 
-  /** 设置底部上下文（如 "春季农场 · 第 12 天"） */
+  /** 设置底部上下文（如 "Agent Xi 内核 · localhost:9731"） */
   setBottomContext(text: string): void {
     this.bottomCtxEl.textContent = text;
   }
@@ -64,5 +64,14 @@ export class StatusBar {
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
     this.clockEl.textContent = `${hh}:${mm}`;
+    this.seasonEl.textContent = `${StatusBar._seasonOf(d.getMonth() + 1)} ${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+
+  /** 按月份映射季节（像素农场风味，数据为真） */
+  private static _seasonOf(month: number): string {
+    if (month >= 3 && month <= 5) return '春季';
+    if (month >= 6 && month <= 8) return '夏季';
+    if (month >= 9 && month <= 11) return '秋季';
+    return '冬季';
   }
 }

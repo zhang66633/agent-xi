@@ -11,7 +11,7 @@ export const SESSION_STORAGE_KEY = 'agent_xi_session_id';
 
 // ─── 版本 ─────────────────────────────────────────────────
 export const CONSOLE_VERSION = 'v2.7';
-export const CONSOLE_CONTEXT = '春季农场 · 第 12 天';
+export const CONSOLE_CONTEXT = `Agent Xi 内核 · ${window.location.hostname}:9731`;
 
 // ─── 应用配置 ─────────────────────────────────────────────
 export const LOG_MAX_ENTRIES = 500;
