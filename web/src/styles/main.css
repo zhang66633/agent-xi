@@ -1834,3 +1834,246 @@ button,
   background: var(--wood-light);
   color: var(--cream);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   设置视图（P3）— Keys / 平台连接 / 记忆统计
+   ═══════════════════════════════════════════════════════════ */
+
+#view-settings {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 30px,
+      rgba(0, 0, 0, 0.08) 30px,
+      rgba(0, 0, 0, 0.08) 31px
+    ),
+    var(--wood-dark);
+}
+
+/* ─── 面板区块 ────────────────────────────────────────── */
+.set-panel {
+  padding: 14px 16px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 10px,
+      rgba(0, 0, 0, 0.05) 10px,
+      rgba(0, 0, 0, 0.05) 11px
+    ),
+    var(--wood-mid);
+  border: 2px solid #000;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.08),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    2px 2px 0 #000,
+    3px 3px 0 rgba(0, 0, 0, 0.6);
+}
+
+.set-panel-title {
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--gold-bright);
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+  margin-bottom: 4px;
+}
+.set-panel-note {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: var(--text-light);
+  margin-bottom: 12px;
+}
+
+.set-empty {
+  padding: 12px 0;
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+/* ─── API Keys ────────────────────────────────────────── */
+.set-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.set-key-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "info  state"
+    "form  form";
+  gap: 6px 12px;
+  padding: 10px 12px;
+  background: var(--wood-darkest);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.set-key-info { grid-area: info; }
+.set-key-name {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  color: var(--cream);
+}
+.set-key-desc {
+  font-size: 10px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+.set-key-state {
+  grid-area: state;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-online);
+  padding: 2px 8px;
+  background: rgba(125, 206, 130, 0.1);
+  border: 1px solid var(--c-online-deep);
+}
+.set-key-state.unset {
+  color: var(--text-light);
+  background: transparent;
+  border-color: var(--wood-light);
+}
+
+.set-key-form {
+  grid-area: form;
+  display: flex;
+  gap: 8px;
+}
+.set-key-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--cream);
+  background: var(--wood-dark);
+  border: 2px solid #000;
+  border-radius: 0;
+  outline: none;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+.set-key-input:focus {
+  border-color: var(--gold-bright);
+  box-shadow:
+    inset 2px 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 0 2px var(--gold),
+    0 0 8px rgba(244, 208, 63, 0.4);
+}
+.set-save-btn { align-self: center; }
+
+/* ─── 平台连接 ────────────────────────────────────────── */
+.set-plats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.set-plat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--wood-darkest);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+.set-plat-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border: 1px solid #000;
+}
+.set-plat-dot.on {
+  background: var(--c-online);
+  box-shadow: 0 0 4px rgba(125, 206, 130, 0.8);
+}
+.set-plat-dot.off { background: var(--wood-light); }
+.set-plat-name {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  color: var(--cream);
+  min-width: 84px;
+}
+.set-plat-detail {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+/* ─── 记忆统计 ────────────────────────────────────────── */
+.set-mem-stats {
+  display: flex;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+.set-mem-num {
+  flex: 1;
+  padding: 10px 12px;
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  color: var(--text-on-dark);
+  background: var(--wood-darkest);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+.set-mem-num b {
+  color: var(--gold-bright);
+  font-size: 14px;
+}
+
+.set-mem-subtitle {
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+.set-mem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.set-mem-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text-on-dark);
+  background: var(--wood-darkest);
+  border: 1px solid #000;
+  box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.4);
+}
+.set-mem-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set-mem-cat {
+  flex-shrink: 0;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  padding: 1px 5px;
+  color: var(--wood-darkest);
+  background: var(--c-system);
+  border: 1px solid #000;
+}

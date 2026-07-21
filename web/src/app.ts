@@ -24,6 +24,7 @@ import { CommandInput, detectCommandType } from './ui/command';
 import { StatusBar } from './ui/statusbar';
 import { ToolConfirmDialog } from './ui/tool_confirm';
 import { MarketView } from './ui/market';
+import { SettingsView } from './ui/settings';
 import type { Agent, LogEntry, Quest, LogType } from './types';
 
 // 后端轮询间隔
@@ -49,6 +50,7 @@ export class App {
   private status!: StatusBar;
   private confirmDialog!: ToolConfirmDialog;
   private market!: MarketView;
+  private settings!: SettingsView;
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private currentAgentId: string | null = null;
@@ -94,8 +96,21 @@ export class App {
         text,
       });
     });
+
+    // 设置视图：进入时拉取 keys/记忆数据
+    this.settings = new SettingsView();
+    this.settings.setEventHandler((text, kind) => {
+      this.log.append({
+        id: `set-${Date.now()}`,
+        time: this._now(),
+        type: kind === 'error' ? 'error' : 'system',
+        text,
+      });
+    });
+
     this.router.onChange((view) => {
       if (view === 'market') void this.market.refresh();
+      if (view === 'settings') void this.settings.refresh();
     });
 
     // 启动：先放 Xi 占位 + 演示智能体，再尝试连后端

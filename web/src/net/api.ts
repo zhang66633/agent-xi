@@ -49,6 +49,20 @@ export interface MarketResult {
   error?: string;
 }
 
+export interface KeyInfo {
+  var: string;
+  name: string;
+  desc: string;
+  configured: boolean;
+  masked: string;
+}
+
+export interface MemoryFact {
+  content: string;
+  category: string;
+  updated_at: number;
+}
+
 class ApiClient {
   private async _get<T>(path: string): Promise<T> {
     const ctrl = new AbortController();
@@ -137,6 +151,27 @@ class ApiClient {
   /** 卸载 MCP 或技能 */
   async marketUninstall(type: 'mcp' | 'skill', id: string): Promise<MarketResult> {
     return this._post<MarketResult>('/api/market/uninstall', { type, id });
+  }
+
+  // ─── 设置 ─────────────────────────────────────────────
+
+  /** API Key 列表（masked） */
+  async settingsKeys(): Promise<KeyInfo[]> {
+    const data = await this._get<{ keys: KeyInfo[] }>('/api/settings/keys');
+    return data.keys ?? [];
+  }
+
+  /** 保存 API Key 到 .env（重启后端生效） */
+  async saveKey(varName: string, key: string): Promise<MarketResult> {
+    return this._post<MarketResult>('/api/settings/keys', { var: varName, key });
+  }
+
+  /** 最近 N 条语义记忆 */
+  async memoryRecent(limit = 5): Promise<MemoryFact[]> {
+    const data = await this._get<{ facts: MemoryFact[] }>(
+      `/api/memory/recent?limit=${limit}`,
+    );
+    return data.facts ?? [];
   }
 }
 

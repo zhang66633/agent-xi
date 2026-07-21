@@ -195,6 +195,40 @@ def create_app(session_manager: SessionManager) -> FastAPI:
 
         return result
 
+    # ─── 设置 API ─────────────────────────────────────────────────
+
+    @app.get("/api/settings/keys")
+    async def settings_keys() -> dict:
+        """API Key 列表（masked，永不回传明文）。"""
+        from .settings_api import list_keys
+        return {"keys": list_keys()}
+
+    @app.post("/api/settings/keys")
+    async def settings_save_key(data: dict) -> dict:
+        """保存 API Key 到 .env（重启后端生效）。"""
+        from .settings_api import save_key
+        var = data.get("var", "")
+        key = data.get("key", "")
+        if not var or not key:
+            return {"ok": False, "error": "缺少 var 或 key"}
+        return save_key(var, key)
+
+    @app.get("/api/memory/recent")
+    async def memory_recent(limit: int = 5) -> dict:
+        """最近 N 条语义记忆（设置页展示用，上限 20）。"""
+        memory = session_manager._memory
+        facts = memory.semantic.get_all(limit=max(1, min(limit, 20)))
+        return {
+            "facts": [
+                {
+                    "content": f["content"],
+                    "category": f["category"],
+                    "updated_at": f["updated_at"],
+                }
+                for f in facts
+            ]
+        }
+
     # ─── 静态文件（生产模式）────────────────────────────────────────
 
     if _WEB_DIST.exists():
