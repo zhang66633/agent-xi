@@ -1,75 +1,111 @@
-"""记忆管理器 — 统一协调两层持久记忆。
+"""记忆管理器 — 整合文档范式。
+
+核心变化（v2）：
+- 用户画像 = config/service.md（整合文档），会话结束时 LLM 整体重写
+- 不再使用原子 fact 提取（删除规则快捕 + SQLite semantic）
+- 情景记忆（LanceDB）保留：用户显式"记住..."时存储，向量检索浮现
 
 职责：
-- 初始化并持有情景记忆 / 语义记忆实例
-- 提供统一的 remember / recall 接口
-- 对话结束时触发 LLM 深度提取（语义记忆）
-- 规则快捕：每轮用户输入后自动扫描偏好/事实
-
-注：对话滑动窗口（原 WorkingMemory）已移除，
-当前对话历史由 Brain.history + ContextBuilder 裁剪管理。
+- 初始化并持有情景记忆实例
+- recall_context：检索相关情景记忆
+- on_conversation_end：整体重写 service.md + 版本快照
+- remember_episode：显式记忆存储
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from ..llm.base import LLMClient
 from ..llm.types import ChatRequest, Message, Role
 from .embedding import EmbeddingClient
 from .episodic import EpisodicMemory
-from .semantic import SemanticMemory
 
 logger = logging.getLogger(__name__)
 
-# LLM 提取语义记忆的 prompt
-_EXTRACT_PROMPT = """\
-分析以下对话，提取用户的偏好、习惯、事实信息。
-只输出确定性的信息，每条一行，格式：类别|内容
-类别包括：preference（偏好）、habit（习惯）、fact（事实）、current_project（当前项目）
-如果没有新信息，输出：无
+# 整体重写 service.md 的 prompt
+_REWRITE_PROMPT = """\
+你正在更新你的「我为谁服务」档案——这是你对用户的长期认知。
 
-对话内容：
+当前档案：
+---
+{current_service}
+---
+
+本轮对话：
+---
 {conversation}
-"""
+---
+
+请重写这份档案。规则：
+- 整合新信息，删除过时内容，合并重复项
+- 只保留长期有价值的认知（不要记录一次性任务细节）
+- 保持简洁，控制在 300 字以内
+- 用自然语言描述，像写给未来的自己看的备忘录
+- 保留开头的 "# 我为谁服务" 标题
+- 如果本轮对话没有产生新认知，原样返回当前档案即可
+
+直接输出完整的新档案内容："""
+
+# 人设进化建议 prompt（identity/personality 修改建议）
+_EVOLVE_PROMPT = """\
+基于以下对话，你对自己的身份或行为准则有没有新的感悟？
+
+当前身份：
+{identity}
+
+当前行为准则：
+{personality}
+
+本轮对话：
+{conversation}
+
+如果有感悟，用以下格式输出修改建议（可以多条）：
+文件|修改描述
+例如：personality|加一条"用户讨论架构时，先给结论再展开"
+
+如果没有感悟，输出：无"""
 
 
 class MemoryManager:
-    """统一记忆管理器。"""
+    """整合文档范式的记忆管理器。"""
 
     def __init__(
         self,
         data_dir: Path,
         embedding_client: EmbeddingClient,
         llm_client: LLMClient,
+        config_dir: Path | None = None,
     ) -> None:
         self._data_dir = data_dir
         self._llm = llm_client
+        self._config_dir = config_dir or (
+            Path(__file__).parent.parent.parent.parent / "config"
+        )
 
-        # 初始化两层持久记忆（对话窗口由 Brain.history + ContextBuilder 管理）
+        # 情景记忆（保留）
         self.episodic = EpisodicMemory(
             db_path=data_dir / "episodic",
             embedding_client=embedding_client,
         )
-        self.semantic = SemanticMemory(
-            db_path=data_dir / "semantic.db",
-        )
+
+        # 人设文件路径
+        self._service_path = self._config_dir / "service.md"
+        self._identity_path = self._config_dir / "identity.md"
+        self._personality_path = self._config_dir / "personality.md"
+
+        # 版本快照目录
+        self._history_dir = data_dir / "persona_history"
+        self._history_dir.mkdir(parents=True, exist_ok=True)
 
     async def on_user_input(self, text: str) -> list[str]:
-        """每轮用户输入后调用：规则快捕语义记忆。
+        """兼容接口：不再做规则快捕，直接返回空。
 
-        Returns:
-            新捕获的事实列表（用于反馈给用户）。
+        保留方法签名避免调用方报错，但不再提取任何内容。
         """
-        captures = self.semantic.extract_from_text(text)
-        stored: list[str] = []
-        for content, category in captures:
-            is_new = self.semantic.store(content, category=category, source="rule")
-            if is_new:
-                stored.append(content)
-                logger.info("规则捕获: [%s] %s", category, content)
-        return stored
+        return []
 
     async def remember_episode(
         self,
@@ -83,81 +119,155 @@ class MemoryManager:
         return memory_id
 
     async def recall_context(self, query: str, top_k: int = 3) -> str:
-        """检索相关记忆，格式化为可注入 prompt 的文本。
+        """检索相关情景记忆，格式化为可注入 prompt 的文本。
 
-        合并情景记忆和语义记忆的结果。
+        注意：用户画像（service.md）已在 system prompt 中，
+        此处只返回情景记忆的检索结果。
         """
-        parts: list[str] = []
-
-        # 情景记忆检索
         episodes = await self.episodic.recall(query, top_k=top_k)
-        if episodes:
-            parts.append("[相关历史记忆]")
-            for ep in episodes:
-                parts.append(f"- {ep['summary']}")
+        if not episodes:
+            return ""
 
-        # 语义记忆（用户画像）
-        semantic_text = self.semantic.format_for_prompt(limit=5)
-        if semantic_text:
-            parts.append(semantic_text)
-
+        parts = ["[相关历史记忆]"]
+        for ep in episodes:
+            parts.append(f"- {ep['summary']}")
         return "\n".join(parts)
 
-    async def on_conversation_end(self, history: list[Message]) -> list[str]:
-        """对话结束时调用：LLM 深度提取语义记忆。
+    def get_profile_summary(self) -> str:
+        """读取 service.md 内容（去掉标题行），供 API/命令展示。
 
-        Args:
-            history: 本次对话的完整消息历史。
+        如果还是初始占位符则返回空串。
+        """
+        content = self._read_file(self._service_path).strip()
+        if not content or "尚未了解用户" in content:
+            return ""
+        # 去掉第一行标题
+        lines = content.splitlines()
+        body = "\n".join(lines[1:]).strip() if lines else ""
+        return body
+
+    async def on_conversation_end(self, history: list[Message]) -> list[str]:
+        """对话结束时：整体重写 service.md + 人设进化建议。
 
         Returns:
-            新提取的事实列表。
+            变更描述列表（用于通知用户）。
         """
         if len(history) < 2:
             return []
 
-        # 格式化对话内容
+        changes: list[str] = []
         conversation_text = self._format_history(history)
 
-        # 调用 LLM 提取
-        extract_content = _EXTRACT_PROMPT.format(
-            conversation=conversation_text
+        # 1. 整体重写 service.md
+        service_changed = await self._rewrite_service(conversation_text)
+        if service_changed:
+            changes.append("更新了对你的了解")
+
+        # 2. 人设进化建议（仅记录日志，不自动修改）
+        await self._suggest_evolution(conversation_text)
+
+        return changes
+
+    async def _rewrite_service(self, conversation_text: str) -> bool:
+        """整体重写 service.md。
+
+        Returns:
+            True 如果内容发生了变化。
+        """
+        current = self._read_file(self._service_path)
+
+        prompt = _REWRITE_PROMPT.format(
+            current_service=current,
+            conversation=conversation_text,
         )
+
         request = ChatRequest(
-            messages=[Message(role=Role.USER, content=extract_content)],
-            system="你是一个信息提取助手，只输出结构化结果。",
-            temperature=0.1,
-            max_tokens=500,
+            messages=[Message(role=Role.USER, content=prompt)],
+            system="你是一个档案维护助手。只输出档案内容，不要解释。",
+            temperature=0.3,
+            max_tokens=800,
         )
 
         try:
             response = await self._llm.chat(request)
-            extracted_text = response.message.text
+            new_content = response.message.text.strip()
         except Exception as e:
-            logger.warning("LLM 提取失败: %s", e)
-            return []
+            logger.warning("service.md 重写失败: %s", e)
+            return False
 
-        # 解析提取结果
-        return self._parse_extraction(extracted_text)
+        # 基本校验：不能为空，必须有一定长度
+        if not new_content or len(new_content) < 10:
+            logger.warning("service.md 重写结果过短，跳过")
+            return False
 
-    def _parse_extraction(self, text: str) -> list[str]:
-        """解析 LLM 提取结果并存入语义记忆。"""
-        stored: list[str] = []
-        for line in text.strip().splitlines():
-            line = line.strip()
-            if not line or line == "无":
-                continue
-            if "|" in line:
-                category, content = line.split("|", 1)
-                category = category.strip().lower()
-                content = content.strip()
-                if content and len(content) >= 4:
-                    is_new = self.semantic.store(
-                        content, category=category, source="llm", confidence=0.8
-                    )
-                    if is_new:
-                        stored.append(content)
-                        logger.info("LLM 提取: [%s] %s", category, content)
-        return stored
+        # 确保有标题
+        if not new_content.startswith("#"):
+            new_content = f"# 我为谁服务\n\n{new_content}"
+
+        # 比较是否有变化
+        if new_content.strip() == current.strip():
+            return False
+
+        # 保存快照
+        self._save_snapshot("service.md", current)
+
+        # 写入新内容
+        self._service_path.write_text(new_content, encoding="utf-8")
+        logger.info("service.md 已更新 (%d → %d 字符)", len(current), len(new_content))
+        return True
+
+    async def _suggest_evolution(self, conversation_text: str) -> None:
+        """人设进化建议（v1 仅记录，不自动修改）。"""
+        identity = self._read_file(self._identity_path)
+        personality = self._read_file(self._personality_path)
+
+        prompt = _EVOLVE_PROMPT.format(
+            identity=identity,
+            personality=personality,
+            conversation=conversation_text,
+        )
+
+        request = ChatRequest(
+            messages=[Message(role=Role.USER, content=prompt)],
+            system="你是一个自省助手。只输出结构化结果。",
+            temperature=0.2,
+            max_tokens=300,
+        )
+
+        try:
+            response = await self._llm.chat(request)
+            result = response.message.text.strip()
+            if result and result != "无":
+                logger.info("人设进化建议: %s", result)
+                # TODO v2: 存储建议，下次对话时征求用户同意后应用
+        except Exception as e:
+            logger.debug("人设进化建议生成失败（非关键）: %s", e)
+
+    def _save_snapshot(self, filename: str, content: str) -> None:
+        """保存文件快照到 persona_history/。"""
+        if not content.strip():
+            return
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        snapshot_path = self._history_dir / f"{filename}.{ts}.bak"
+        snapshot_path.write_text(content, encoding="utf-8")
+        logger.debug("快照已保存: %s", snapshot_path.name)
+
+        # 清理旧快照（每个文件最多保留 20 个）
+        self._cleanup_snapshots(filename, keep=20)
+
+    def _cleanup_snapshots(self, filename: str, keep: int = 20) -> None:
+        """清理多余快照。"""
+        pattern = f"{filename}.*.bak"
+        snapshots = sorted(self._history_dir.glob(pattern))
+        while len(snapshots) > keep:
+            oldest = snapshots.pop(0)
+            oldest.unlink()
+
+    @staticmethod
+    def _read_file(path: Path) -> str:
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        return ""
 
     @staticmethod
     def _format_history(history: list[Message], max_turns: int = 20) -> str:
@@ -171,4 +281,4 @@ class MemoryManager:
 
     def close(self) -> None:
         """关闭所有资源。"""
-        self.semantic.close()
+        pass

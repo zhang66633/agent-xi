@@ -301,14 +301,12 @@ async def _handle_command(
                 })
                 return
             ep = memory.episodic.count
-            se = memory.semantic.count
-            lines = [f"记忆统计：情景记忆 {ep} 条 · 语义记忆 {se} 条"]
-            facts = memory.semantic.get_all(limit=5)
-            if facts:
-                lines.append("最近记忆：")
-                lines.extend(f"- {f['content']}" for f in facts)
+            profile = memory.get_profile_summary()
+            lines = [f"记忆统计：情景记忆 {ep} 条"]
+            if profile:
+                lines.append(f"用户画像：\n{profile}")
             else:
-                lines.append("（还没有记住关于你的任何事）")
+                lines.append("（还没有建立对你的认知）")
             await ws.send_json({
                 "type": "system",
                 "message": "\n".join(lines),

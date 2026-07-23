@@ -151,27 +151,22 @@ export class SettingsView {
 
   private async _loadMemory(): Promise<void> {
     try {
-      const [stats, facts] = await Promise.all([
+      const [stats, profile] = await Promise.all([
         api.memoryStats(),
-        api.memoryRecent(5),
+        api.memoryProfile(),
       ]);
 
-      const factRows = facts.length > 0
-        ? facts.map((f) => `
-            <div class="set-mem-item">
-              <span class="set-mem-content">${this._escape(f.content)}</span>
-              <span class="set-mem-cat">${this._escape(f.category)}</span>
-            </div>
-          `).join('')
-        : '<div class="set-empty">暂无语义记忆（对话中用 /remember 或自然表达偏好即可积累）</div>';
+      const profileHtml = profile
+        ? `<div class="set-mem-profile">${this._escape(profile)}</div>`
+        : '<div class="set-empty">尚未建立用户画像（对话结束后自动更新）</div>';
 
       this.memoryEl.innerHTML = `
         <div class="set-mem-stats">
           <div class="set-mem-num">情景记忆 <b>${stats.episodic_count}</b> 条</div>
-          <div class="set-mem-num">语义记忆 <b>${stats.semantic_count}</b> 条</div>
+          <div class="set-mem-num">用户画像 <b>${stats.profile_ready ? '已建立' : '未建立'}</b></div>
         </div>
-        <div class="set-mem-subtitle">最近语义记忆</div>
-        <div class="set-mem-list">${factRows}</div>
+        <div class="set-mem-subtitle">Xi 对你的认知</div>
+        ${profileHtml}
       `;
     } catch {
       this.memoryEl.innerHTML =

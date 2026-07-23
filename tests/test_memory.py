@@ -1,4 +1,4 @@
-"""冒烟测试 — 记忆系统（语义 SQLite + 情景 LanceDB，全本地无网络）。"""
+"""冒烟测试 — 记忆系统（整合文档范式 + 情景 LanceDB，全本地无网络）。"""
 
 from __future__ import annotations
 
@@ -6,45 +6,8 @@ import pytest
 
 from agent_xi.memory.episodic import EpisodicMemory
 from agent_xi.memory.manager import MemoryManager
-from agent_xi.memory.semantic import SemanticMemory
 
 from .conftest import FakeEmbedding, ScriptedLLM
-
-
-# ─── 语义记忆 ──────────────────────────────────────────────
-
-
-def test_semantic_store_and_dedupe(tmp_path):
-    mem = SemanticMemory(db_path=tmp_path / "semantic.db")
-    assert mem.store("我喜欢像素风游戏", category="preference") is True
-    # 重复存储 → 返回 False（更新而非新增）
-    assert mem.store("我喜欢像素风游戏", category="preference") is False
-    assert mem.count == 1
-    mem.close()
-
-
-def test_semantic_query_and_prompt(tmp_path):
-    mem = SemanticMemory(db_path=tmp_path / "semantic.db")
-    mem.store("我喜欢星露谷物语", category="preference")
-    mem.store("我的项目在 D 盘", category="fact")
-
-    hits = mem.query(keyword="星露谷")
-    assert len(hits) == 1
-    assert "星露谷" in hits[0]["content"]
-
-    prompt = mem.format_for_prompt()
-    assert "用户画像" in prompt
-    assert "星露谷物语" in prompt
-    mem.close()
-
-
-def test_semantic_rule_capture(tmp_path):
-    mem = SemanticMemory(db_path=tmp_path / "semantic.db")
-    captures = mem.extract_from_text("我喜欢在深夜写代码，记住我的咖啡是美式")
-    categories = {c for _, c in captures}
-    assert "preference" in categories
-    assert "fact" in categories
-    mem.close()
 
 
 # ─── 情景记忆 ──────────────────────────────────────────────
@@ -66,45 +29,140 @@ async def test_episodic_remember_recall(tmp_path):
 # ─── MemoryManager 集成 ────────────────────────────────────
 
 
-async def test_manager_on_user_input_captures(tmp_path):
+async def test_manager_on_user_input_returns_empty(tmp_path):
+    """v2: on_user_input 不再做规则快捕，返回空列表。"""
     llm = ScriptedLLM([])
     mgr = MemoryManager(
-        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm
+        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm,
+        config_dir=tmp_path / "config",
     )
+    (tmp_path / "config").mkdir(exist_ok=True)
+    (tmp_path / "config" / "service.md").write_text("# 我为谁服务\n\n（尚未了解用户）", encoding="utf-8")
     stored = await mgr.on_user_input("我喜欢像素风游戏，我习惯深夜写代码")
-    assert any("像素风游戏" in s for s in stored)
-    assert any("深夜写代码" in s for s in stored)
-    assert mgr.semantic.count >= 2
+    assert stored == []
     mgr.close()
 
 
-async def test_manager_recall_context_merges(tmp_path):
+async def test_manager_recall_context_episodic_only(tmp_path):
+    """v2: recall_context 只返回情景记忆，不再注入语义 facts。"""
     llm = ScriptedLLM([])
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "service.md").write_text("# 我为谁服务\n\n（尚未了解用户）", encoding="utf-8")
+
     mgr = MemoryManager(
-        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm
+        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm,
+        config_dir=config_dir,
     )
     await mgr.remember_episode("一起修复了 CSS 遮罩 bug", summary="修 bug")
-    mgr.semantic.store("用户喜欢像素风", category="preference")
 
     ctx = await mgr.recall_context("CSS 问题")
     assert "相关历史记忆" in ctx
-    assert "用户画像" in ctx
+    assert "修 bug" in ctx
     mgr.close()
 
 
-async def test_manager_deep_extraction(tmp_path):
-    """对话结束 → LLM 提取 '类别|内容' 行入库。"""
-    llm = ScriptedLLM([[("text", "preference|用户喜欢喝美式咖啡\nfact|用户养了一只猫")]])
+async def test_manager_recall_context_empty(tmp_path):
+    """无情景记忆时返回空串。"""
+    llm = ScriptedLLM([])
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "service.md").write_text("# 我为谁服务\n\n（尚未了解用户）", encoding="utf-8")
+
     mgr = MemoryManager(
-        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm
+        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm,
+        config_dir=config_dir,
     )
+    ctx = await mgr.recall_context("随便问点什么")
+    assert ctx == ""
+    mgr.close()
+
+
+async def test_manager_rewrite_service(tmp_path):
+    """对话结束 → LLM 整体重写 service.md。"""
+    new_profile = "# 我为谁服务\n\n用户是开发者，主力 Python，喜欢简洁回答。"
+    llm = ScriptedLLM([
+        [("text", new_profile)],  # _rewrite_service 调用
+        [("text", "无")],         # _suggest_evolution 调用
+    ])
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "service.md").write_text("# 我为谁服务\n\n（尚未了解用户）", encoding="utf-8")
+    (config_dir / "identity.md").write_text("# 我是谁\n\nXi", encoding="utf-8")
+    (config_dir / "personality.md").write_text("# 行为准则\n\n简洁", encoding="utf-8")
+
+    mgr = MemoryManager(
+        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm,
+        config_dir=config_dir,
+    )
+
+    from agent_xi.llm.types import Message, Role
+
+    history = [
+        Message(role=Role.USER, content="帮我写个快排"),
+        Message(role=Role.ASSISTANT, content="好的，这是快排实现..."),
+    ]
+    changes = await mgr.on_conversation_end(history)
+
+    # service.md 应该被更新
+    updated = (config_dir / "service.md").read_text(encoding="utf-8")
+    assert "开发者" in updated
+    assert "Python" in updated
+    assert "更新了对你的了解" in changes
+
+    # 应该有快照
+    snapshots = list((tmp_path / "persona_history").glob("service.md.*.bak"))
+    assert len(snapshots) == 1
+    mgr.close()
+
+
+async def test_manager_no_change_no_snapshot(tmp_path):
+    """对话无新认知 → service.md 不变 → 无快照。"""
+    original = "# 我为谁服务\n\n用户是开发者。"
+    llm = ScriptedLLM([
+        [("text", original)],  # 返回相同内容
+        [("text", "无")],
+    ])
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(exist_ok=True)
+    (config_dir / "service.md").write_text(original, encoding="utf-8")
+    (config_dir / "identity.md").write_text("# 我是谁", encoding="utf-8")
+    (config_dir / "personality.md").write_text("# 行为准则", encoding="utf-8")
+
+    mgr = MemoryManager(
+        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm,
+        config_dir=config_dir,
+    )
+
     from agent_xi.llm.types import Message, Role
 
     history = [
         Message(role=Role.USER, content="你好"),
         Message(role=Role.ASSISTANT, content="你好呀"),
     ]
-    extracted = await mgr.on_conversation_end(history)
-    assert len(extracted) == 2
-    assert mgr.semantic.count == 2
+    changes = await mgr.on_conversation_end(history)
+    assert changes == []
+
+    snapshots = list((tmp_path / "persona_history").glob("*.bak"))
+    assert len(snapshots) == 0
+    mgr.close()
+
+
+def test_get_profile_summary(tmp_path):
+    """get_profile_summary 正确返回/隐藏内容。"""
+    config_dir = tmp_path / "config"
+    config_dir.mkdir(exist_ok=True)
+    llm = ScriptedLLM([])
+
+    # 占位符 → 空
+    (config_dir / "service.md").write_text("# 我为谁服务\n\n（尚未了解用户，等待第一次对话。）", encoding="utf-8")
+    mgr = MemoryManager(
+        data_dir=tmp_path, embedding_client=FakeEmbedding(), llm_client=llm,
+        config_dir=config_dir,
+    )
+    assert mgr.get_profile_summary() == ""
+
+    # 有内容 → 返回去掉标题的正文
+    (config_dir / "service.md").write_text("# 我为谁服务\n\n用户是开发者，喜欢简洁。", encoding="utf-8")
+    assert "开发者" in mgr.get_profile_summary()
     mgr.close()

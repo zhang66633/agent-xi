@@ -173,9 +173,10 @@ class CliApp:
             return
 
         episode_count = self._memory.episodic.count
-        semantic_count = self._memory.semantic.count
+        profile = self._memory.get_profile_summary()
+        profile_status = "已建立" if profile else "未建立"
         self._console.print(
-            f"[dim]情景记忆：{episode_count} 条 | 语义记忆：{semantic_count} 条[/]"
+            f"[dim]情景记忆：{episode_count} 条 | 用户画像：{profile_status}[/]"
         )
 
     async def _handle_save_skill(self, arg: str) -> None:

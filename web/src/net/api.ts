@@ -20,7 +20,7 @@ export interface SkillInfo {
 
 export interface MemoryStats {
   episodic_count: number;
-  semantic_count: number;
+  profile_ready: boolean;
 }
 
 export interface HealthInfo {
@@ -202,12 +202,10 @@ class ApiClient {
     return this._post<MarketResult>('/api/settings/keys', { var: varName, key });
   }
 
-  /** 最近 N 条语义记忆 */
-  async memoryRecent(limit = 5): Promise<MemoryFact[]> {
-    const data = await this._get<{ facts: MemoryFact[] }>(
-      `/api/memory/recent?limit=${limit}`,
-    );
-    return data.facts ?? [];
+  /** 用户画像内容 */
+  async memoryProfile(): Promise<string> {
+    const data = await this._get<{ profile: string }>('/api/memory/recent');
+    return data.profile ?? '';
   }
 }
 
@@ -218,16 +216,15 @@ export const api = new ApiClient();
 /** 把后端 memory stats + tools + skills 映射成 Xi 智能体卡片 */
 export function mapXiAgent(stats: MemoryStats, tools: ToolInfo[], skills: SkillInfo[]): Agent {
   const episodicCap = 500;
-  const semanticCap = 200;
   const en = Math.min(100, Math.round((stats.episodic_count / episodicCap) * 100));
-  // 友好度：基于语义记忆丰富度
-  const hearts = Math.min(10, Math.max(1, Math.ceil(stats.semantic_count / 20)));
+  // 友好度：画像已建立则起步 5 心
+  const hearts = stats.profile_ready ? 5 : 1;
 
   return {
     id: 'xi',
     name: 'Xi',
     role: '智能体',
-    level: Math.max(1, Math.floor((stats.episodic_count + stats.semantic_count) / 50) + 1),
+    level: Math.max(1, Math.floor(stats.episodic_count / 50) + 1),
     state: 'active',
     en,
     hearts,

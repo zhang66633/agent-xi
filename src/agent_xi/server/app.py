@@ -84,7 +84,7 @@ def create_app(session_manager: SessionManager) -> FastAPI:
         memory = session_manager._memory
         return {
             "episodic_count": memory.episodic.count,
-            "semantic_count": memory.semantic.count,
+            "profile_ready": bool(memory.get_profile_summary()),
         }
 
     @app.get("/api/skills")
@@ -215,18 +215,11 @@ def create_app(session_manager: SessionManager) -> FastAPI:
 
     @app.get("/api/memory/recent")
     async def memory_recent(limit: int = 5) -> dict:
-        """最近 N 条语义记忆（设置页展示用，上限 20）。"""
+        """用户画像内容（设置页展示用）。"""
         memory = session_manager._memory
-        facts = memory.semantic.get_all(limit=max(1, min(limit, 20)))
+        profile = memory.get_profile_summary()
         return {
-            "facts": [
-                {
-                    "content": f["content"],
-                    "category": f["category"],
-                    "updated_at": f["updated_at"],
-                }
-                for f in facts
-            ]
+            "profile": profile or "",
         }
 
     # ─── 上传 API ─────────────────────────────────────────────────
