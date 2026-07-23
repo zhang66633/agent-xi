@@ -29,6 +29,9 @@ WEB_V2_PLAN.md
 pixel-ui-plan.md
 teach.md
 
+# 部署脚本（含服务器凭据）
+deploy.py
+
 # 内存数据
 *.db
 *.sqlite

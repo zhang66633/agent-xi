@@ -10,14 +10,10 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
-# 系统依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl && rm -rf /var/lib/apt/lists/*
-
-# Python 依赖
+# Python 依赖（清华源加速）
 COPY pyproject.toml ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 配置文件
 COPY config/ ./config/
