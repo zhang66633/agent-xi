@@ -1,0 +1,10 @@
+services:
+  xi:
+    build: .
+    ports:
+      - "9731:9731"
+    volumes:
+      - ./config:/app/config
+      - ./.data:/app/.data
+      - ./.env:/app/.env
+    restart: unless-stopped

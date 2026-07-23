@@ -5,14 +5,23 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import sys
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Agent Xi Server")
+    parser.add_argument("--host", default="127.0.0.1", help="监听地址")
+    parser.add_argument("--port", type=int, default=9731, help="监听端口")
+    return parser.parse_args()
 
 
 def main() -> None:
     """同步入口：加载配置 → 初始化核心 → 启动 uvicorn。"""
     from ..config import load_settings
 
+    args = _parse_args()
     settings = load_settings()
 
     if not settings.llm.api_key:
@@ -20,12 +29,12 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        asyncio.run(_async_main(settings))
+        asyncio.run(_async_main(settings, host=args.host, port=args.port))
     except KeyboardInterrupt:
         print("\nServer stopped.")
 
 
-async def _async_main(settings: object) -> None:
+async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 9731) -> None:
     """异步主流程：初始化所有组件 → 启动 uvicorn。"""
     from pathlib import Path
 
@@ -108,18 +117,18 @@ async def _async_main(settings: object) -> None:
         # 启动 uvicorn
         config = uvicorn.Config(
             app,
-            host="127.0.0.1",
-            port=9731,
+            host=host,
+            port=port,
             log_level="info",
         )
         server = uvicorn.Server(config)
 
-        print("\n  Agent Xi Server")
+        print(f"\n  Agent Xi Server")
         print("  ─────────────────────────────")
-        print("  WebSocket: ws://127.0.0.1:9731/ws/chat")
-        print("  Health:    http://127.0.0.1:9731/api/health")
+        print(f"  WebSocket: ws://{host}:{port}/ws/chat")
+        print(f"  Health:    http://{host}:{port}/api/health")
         if (Path(__file__).parent.parent.parent.parent / "web" / "dist").exists():
-            print("  Web UI:    http://127.0.0.1:9731/")
+            print(f"  Web UI:    http://{host}:{port}/")
         else:
             print("  Web UI:    (未构建，运行 cd web && npm run build)")
         print("  ─────────────────────────────\n")
