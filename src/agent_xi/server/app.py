@@ -8,7 +8,7 @@ from fastapi import FastAPI, File, Form, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .auth import AuthMiddleware, COOKIE_NAME, _verify_token, _ACCESS_PASSWORD
+from .auth import AuthMiddleware, COOKIE_NAME, _verify_token, _get_password
 from .session import SessionManager
 from .ws_chat import handle_ws_chat
 
@@ -49,7 +49,7 @@ def create_app(session_manager: SessionManager) -> FastAPI:
         携带时恢复该会话的对话历史（刷新页面不丢上下文）。
         """
         # 密码门：WebSocket 不走 HTTP 中间件，需单独校验 cookie
-        if _ACCESS_PASSWORD:
+        if _get_password():
             token = ws.cookies.get(COOKIE_NAME, "")
             if not _verify_token(token):
                 await ws.close(code=4003, reason="Unauthorized")

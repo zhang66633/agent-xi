@@ -14,9 +14,6 @@ from fastapi import Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
-# 从环境变量读取密码；未设置则不启用鉴权
-_ACCESS_PASSWORD = os.environ.get("XI_ACCESS_PASSWORD", "")
-
 # 用于签名 cookie 的密钥（每次启动随机，重启后需重新登录）
 _SECRET = secrets.token_hex(32)
 
@@ -24,6 +21,11 @@ COOKIE_NAME = "xi_session"
 
 # 不需要鉴权的路径
 _PUBLIC_PATHS = {"/login", "/api/health"}
+
+
+def _get_password() -> str:
+    """延迟读取密码（确保 load_dotenv 已执行）。"""
+    return os.environ.get("XI_ACCESS_PASSWORD", "")
 
 
 def _make_token(password: str) -> str:
@@ -35,9 +37,10 @@ def _make_token(password: str) -> str:
 
 def _verify_token(token: str) -> bool:
     """校验 cookie 值是否合法。"""
-    if not _ACCESS_PASSWORD:
+    pwd = _get_password()
+    if not pwd:
         return True  # 未设密码 → 不鉴权
-    expected = _make_token(_ACCESS_PASSWORD)
+    expected = _make_token(pwd)
     return hmac.compare_digest(token, expected)
 
 
@@ -97,7 +100,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         # 未设密码 → 不鉴权
-        if not _ACCESS_PASSWORD:
+        password = _get_password()
+        if not password:
             return await call_next(request)
 
         path = request.url.path
@@ -114,7 +118,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if path == "/login" and request.method == "POST":
             form = await request.form()
             pwd = form.get("password", "")
-            if pwd == _ACCESS_PASSWORD:
+            if pwd == password:
                 resp = RedirectResponse("/", status_code=302)
                 resp.set_cookie(
                     COOKIE_NAME,
@@ -125,14 +129,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 )
                 return resp
             return RedirectResponse("/login?error=1", status_code=302)
-
-        # WebSocket 升级请求：检查 cookie
-        if request.scope.get("type") == "websocket":
-            token = request.cookies.get(COOKIE_NAME, "")
-            if not _verify_token(token):
-                # 无法对 WS 做 redirect，直接拒绝
-                return Response(status_code=403)
-            return await call_next(request)
 
         # 普通请求：检查 cookie
         token = request.cookies.get(COOKIE_NAME, "")
