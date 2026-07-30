@@ -391,13 +391,43 @@ async def _handle_command(
             if session_manager:
                 session_manager.save_session(session)
 
+        case "/status":
+            tools_count = len(brain._tools.list_tools()) if brain and brain._tools else 0
+            client = getattr(brain, "_client", None) if brain else None
+            provider = getattr(client, "provider_name", "unknown") if client else "unknown"
+            model = "unknown"
+            if hasattr(client, '_model'): model = client._model
+            elif hasattr(client, 'model'): model = client.model
+            memory = getattr(brain, "_memory", None) if brain else None
+            ep = memory.episodic.count if memory else 0
+            profile = memory.get_profile_summary() if memory else ""
+            lines = [
+                f"Provider: {provider} | Model: {model}",
+                f"工具: {tools_count} 个 | 对话: {brain.turn_count if brain else 0} 轮",
+                f"情景记忆: {ep} 条 | 画像: {'已建立' if profile else '未建立'}",
+            ]
+            await ws.send_json({"type": "system", "message": "\n".join(lines)})
+
+        case "/export":
+            if not brain:
+                await ws.send_json({"type": "system","message": "会话未初始化"})
+                return
+            hist = brain.history
+            lines = ["# Agent Xi 对话记录\n"]
+            for m in hist:
+                role = {"user": "## 用户", "assistant": "## Xi", "tool": "### 工具"}.get(str(m.role), str(m.role))
+                lines.append(f"{role}\n\n{m.text}\n")
+            output = "\n".join(lines)
+            await ws.send_json({"type": "system", "message": f"```markdown\n{output[:3000]}\n```\n\n（共 {len(hist)} 条消息，可复制上方 Markdown 保存）"})
+
         case "/help":
             await ws.send_json({
                 "type": "system",
                 "message": (
-                    "可用命令：/clear（清空）、/undo（撤销）、/history（轮次）、"
-                    "/memory（记忆统计）、/skills（技能列表）、"
-                    "/remember <内容>（记住某事）、/help"
+                    "/clear（清空）/undo（撤销）/history（轮次）\n"
+                    "/status（系统状态）/memory（记忆）/skills（技能）\n"
+                    "/remember <内容>（记住）/export（导出对话）\n"
+                    "/help（此帮助）"
                 ),
             })
 
