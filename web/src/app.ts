@@ -123,6 +123,15 @@ export class App {
       }
     });
 
+    // 全局快捷键
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'l') {
+        e.preventDefault();
+        this.log.clear();
+        this.ws.sendCommand('/clear');
+      }
+    });
+
     this.router.onChange((view) => {
       if (view === 'market') void this.market.refresh();
       if (view === 'settings') void this.settings.refresh();
@@ -359,11 +368,13 @@ export class App {
 
     this.ws.on('text_delta', (msg) => {
       this.log.appendStream(msg.text ?? '', { type: 'chat', source: 'Xi' });
+      document.title = '● Agent Xi';
     });
 
     this.ws.on('done', () => {
       this.log.finalizeStream();
       this.cmd.setMode('run');
+      document.title = 'Agent Xi';
       if (this.currentRunningTool) {
         this._updateQuest(this.currentRunningTool, 'done', 100);
         this.currentRunningTool = null;

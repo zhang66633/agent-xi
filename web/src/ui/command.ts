@@ -73,6 +73,16 @@ export class CommandInput {
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         this._historyNav(1);
+      } else if (e.key === 'Escape') {
+        this.inputEl.value = '';
+      }
+    });
+
+    // 全局快捷键
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        this.focus();
       }
     });
   }

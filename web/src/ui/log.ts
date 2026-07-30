@@ -28,6 +28,21 @@ export class LogPanel {
   constructor() {
     this.listEl = document.getElementById('log-list')!;
     this._bindScroll();
+    this._bindContextMenu();
+  }
+
+  /** 右键复制文本 */
+  private _bindContextMenu(): void {
+    this.listEl.addEventListener('contextmenu', (e) => {
+      const row = (e.target as HTMLElement).closest('.log-row') as HTMLElement | null;
+      if (!row) return;
+      e.preventDefault();
+      const textEl = row.querySelector('.log-text');
+      const text = textEl?.textContent ?? '';
+      if (text) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      }
+    });
   }
 
   /** 追加一条日志 */

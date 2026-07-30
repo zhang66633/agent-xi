@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from ..llm.types import StreamEventType
+from ..llm.types import Role, StreamEventType
 from .session import Session
 
 if TYPE_CHECKING:
@@ -374,11 +374,28 @@ async def _handle_command(
                     "message": f"记忆失败：{e}",
                 })
 
+        case "/undo":
+            if not brain:
+                await ws.send_json({"type": "system","message": "会话未初始化"})
+                return
+            # 回滚最后一条 assistant 及其后的 tool 消息
+            history = brain.history
+            removed = 0
+            while history and history[-1].role in (Role.ASSISTANT, Role.TOOL):
+                history.pop()
+                removed += 1
+            await ws.send_json({
+                "type": "system",
+                "message": f"已撤销最后一轮回复（{removed} 条消息）",
+            })
+            if session_manager:
+                session_manager.save_session(session)
+
         case "/help":
             await ws.send_json({
                 "type": "system",
                 "message": (
-                    "可用命令：/clear（清空）、/history（轮次）、"
+                    "可用命令：/clear（清空）、/undo（撤销）、/history（轮次）、"
                     "/memory（记忆统计）、/skills（技能列表）、"
                     "/remember <内容>（记住某事）、/help"
                 ),
