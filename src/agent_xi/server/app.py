@@ -74,6 +74,54 @@ def create_app(session_manager: SessionManager) -> FastAPI:
             "sessions": session_manager.active_count,
         }
 
+    @app.get("/api/files/tree")
+    async def file_tree(path: str = ".") -> dict:
+        """返回项目文件树。"""
+        import os as _os
+        from pathlib import Path as _Path
+
+        root = _Path(path).resolve()
+        if not root.exists():
+            return {"ok": False, "error": f"路径不存在: {path}"}
+
+        skip = {".git", "__pycache__", "node_modules", ".venv",
+                ".data", "dist", ".pytest_cache", ".ruff_cache",
+                ".idea", ".codebuddy", ".firecrawl", "agent_xi.egg-info",
+                "web/dist/assets"}
+
+        def _walk(p: _Path, depth: int = 0) -> dict | None:
+            if depth > 4:
+                return None
+            name = p.name or str(p)
+            if p.is_dir():
+                if name in skip or name.startswith("."):
+                    return None
+                children = []
+                try:
+                    for entry in sorted(p.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+                        child = _walk(entry, depth + 1)
+                        if child:
+                            children.append(child)
+                except PermissionError:
+                    pass
+                return {
+                    "name": name,
+                    "path": str(p),
+                    "isDir": True,
+                    "children": children[:50],
+                }
+            else:
+                if name.startswith(".") or p.suffix in {".pyc", ".pyo", ".egg"}:
+                    return None
+                return {
+                    "name": name,
+                    "path": str(p),
+                    "isDir": False,
+                }
+
+        tree = _walk(root)
+        return {"ok": True, "tree": tree} if tree else {"ok": False, "error": "无法构建文件树"}
+
     @app.get("/api/tools")
     async def list_tools() -> dict:
         """列出所有已注册工具。"""

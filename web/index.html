@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>智能体控制台 · Agent Xi</title>
   <link rel="stylesheet" href="/src/styles/main.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css">
   <link rel="preload" href="/fonts/zpix.ttf" as="font" type="font/ttf" crossorigin />
 </head>
 <body>
@@ -30,6 +31,9 @@
       <button class="nav-icon active" data-view="console" title="控制台">
         <svg viewBox="0 0 16 16" width="20" height="20"><path d="M2 3h12v8H2z M4 13h8v1H4z" fill="currentColor"/><path d="M4 5l2 2-2 2M8 9h3" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
       </button>
+      <button class="nav-icon" id="nav-filetree" title="文件树（切换）">
+        <svg viewBox="0 0 16 16" width="20" height="20"><path d="M2 4h4v2H2zM2 8h4v2H2zM2 12h4v2H2zM8 3h6M8 7h6M8 11h6" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      </button>
       <button class="nav-icon" data-view="market" title="商店">
         <svg viewBox="0 0 16 16" width="20" height="20"><path d="M3 5h10l1 3v5H2V8l1-3z M5 5V3h6v2" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="5" cy="14" r="1" fill="currentColor"/><circle cx="11" cy="14" r="1" fill="currentColor"/></svg>
       </button>
@@ -48,6 +52,13 @@
           <aside id="roster-panel">
             <div class="panel-title">✦ 冒险者名册</div>
             <div id="roster-list"></div>
+          </aside>
+
+          <!-- 文件树面板（默认隐藏，点击导航切换） -->
+          <aside id="filetree-panel" hidden>
+            <div class="panel-title">✦ 项目文件</div>
+            <div id="filetree-container"></div>
+            <div id="filetree-hint" style="display:none;padding:8px;font-size:10px;color:var(--text-light)">点击文件名可查看内容 · 右键复制路径</div>
           </aside>
 
           <!-- 中栏 · 系统日志 + 命令 -->
@@ -106,6 +117,7 @@
     </footer>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

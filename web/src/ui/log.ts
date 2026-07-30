@@ -164,8 +164,14 @@ export class LogPanel {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   }
 
-  /** 渲染富文本：``` 围栏代码块转成代码区，其余文本走 Markdown 渲染 */
+  /** 渲染富文本：代码块语法高亮 + diff 渲染 + Markdown */
   private _renderRichText(text: string): string {
+    // 1. 先检测 diff 输出
+    if (this._isDiffContent(text)) {
+      return this._renderDiff(text);
+    }
+
+    // 2. 代码块语法高亮
     const re = /```([^\n`]*)\n([\s\S]*?)```/g;
     const out: string[] = [];
     let last = 0;
@@ -175,14 +181,57 @@ export class LogPanel {
       const lang = m[1].trim();
       const code = m[2].replace(/\n+$/, '');
       const label = lang ? `<span class="log-code-lang">${this._escape(lang)}</span>` : '';
+      // 语法高亮
+      let highlighted = this._escape(code);
+      try {
+        if (typeof (window as any).hljs !== 'undefined') {
+          const hljs = (window as any).hljs;
+          if (lang && hljs.getLanguage(lang)) {
+            highlighted = hljs.highlight(code, { language: lang }).value;
+          } else {
+            highlighted = hljs.highlightAuto(code).value;
+          }
+        }
+      } catch { /* highlight.js 不可用时保持纯文本 */ }
       out.push(
-        `<span class="log-code-wrap">${label}<code class="log-code">${this._escape(code)}</code></span>`,
+        `<span class="log-code-wrap">${label}<code class="log-code">${highlighted}</code></span>`,
       );
       last = re.lastIndex;
     }
-    // 剩余文本（可能含未闭合的 ``` 片段）
     if (last < text.length) out.push(this._renderMarkdown(text.slice(last)));
     return out.join('');
+  }
+
+  /** 检测是否是 diff 内容 */
+  private _isDiffContent(text: string): boolean {
+    const lines = text.split('\n');
+    let diffCount = 0;
+    for (const line of lines.slice(0, 30)) {
+      if (/^diff --git|^---\s|^\+\+\+\s|^@@\s/.test(line)) diffCount++;
+    }
+    return diffCount >= 3;
+  }
+
+  /** 渲染 diff 输出（+/- 行样式） */
+  private _renderDiff(text: string): string {
+    const lines = text.split('\n');
+    const blocks: string[] = ['<span class="log-diff-wrap">'];
+    for (const line of lines) {
+      const escaped = this._escape(line);
+      if (line.startsWith('diff --git') || line.startsWith('--- ') || line.startsWith('+++ ')) {
+        blocks.push(`<span class="log-diff-line log-diff-hdr">${escaped}</span>`);
+      } else if (line.startsWith('@@')) {
+        blocks.push(`<span class="log-diff-line log-diff-meta">${escaped}</span>`);
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        blocks.push(`<span class="log-diff-line log-diff-add">${escaped}</span>`);
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        blocks.push(`<span class="log-diff-line log-diff-del">${escaped}</span>`);
+      } else {
+        blocks.push(`<span class="log-diff-line">${escaped}</span>`);
+      }
+    }
+    blocks.push('</span>');
+    return blocks.join('');
   }
 
   /** 轻量 Markdown 渲染：标题/列表/引用/分隔线（块级）+ 粗斜体/行内代码/链接（行内） */

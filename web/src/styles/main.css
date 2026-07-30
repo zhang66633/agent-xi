@@ -2485,3 +2485,80 @@ button,
   background: var(--c-system);
   border: 1px solid #000;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   文件树面板
+   ═══════════════════════════════════════════════════════════ */
+
+#filetree-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--wood-dark);
+  border-right: 3px solid var(--wood-darkest);
+  box-shadow: inset -3px 0 0 rgba(0,0,0,0.4);
+  overflow: hidden;
+  min-width: 180px;
+  max-width: 300px;
+}
+#filetree-container {
+  flex: 1;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: repeating-linear-gradient(0deg,transparent 0px,transparent 18px,rgba(0,0,0,0.04) 18px,rgba(0,0,0,0.04) 19px),var(--wood-dark);
+}
+.ft-loading,.ft-error{padding:12px;color:var(--text-light);font-family:var(--font-pixel);font-size:10px}
+.ft-error{color:var(--c-error)}
+.ft-root{padding:4px 0}
+.ft-row{display:flex;align-items:center;gap:4px;padding:2px 4px;cursor:pointer;white-space:nowrap;transition:background .1s}
+.ft-row:hover{background:rgba(244,208,63,.08)}
+.ft-icon{width:14px;flex-shrink:0;font-size:10px;text-align:center}
+.ft-dir{color:var(--gold-bright)}
+.ft-file{color:var(--text-light)}
+.ft-name{overflow:hidden;text-overflow:ellipsis;color:var(--text-on-dark)}
+.ft-file+.ft-name{cursor:pointer}
+.ft-file+.ft-name:hover{color:var(--gold-bright);text-decoration:underline}
+.ft-children{display:block}
+
+/* ═══════════════════════════════════════════════════════════
+   Diff 渲染 — +/- 行样式
+   ═══════════════════════════════════════════════════════════ */
+
+.log-diff-wrap{display:block;margin:4px 0;font-family:var(--font-mono);font-size:11px;line-height:1.6;overflow-x:auto;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.06);padding:2px 0}
+.log-diff-line{display:block;padding:0 8px;white-space:pre}
+.log-diff-add{background:rgba(125,206,130,.15);color:#b8e6b8}
+.log-diff-add::before{content:"+ ";color:var(--c-online)}
+.log-diff-del{background:rgba(231,76,60,.15);color:#e8a0a0}
+.log-diff-del::before{content:"- ";color:var(--c-error)}
+.log-diff-hdr{color:var(--c-running);font-weight:bold}
+.log-diff-meta{color:var(--text-light);font-style:italic}
+.log-diff-sep{color:var(--gold);text-align:center}
+
+/* ═══════════════════════════════════════════════════════════
+   代码块 — highlight.js 适配
+   ═══════════════════════════════════════════════════════════ */
+
+.log-code-wrap{display:block;margin:6px 0;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+.log-code-lang{display:block;padding:2px 10px;font-family:var(--font-pixel);font-size:9px;color:var(--gold);background:rgba(0,0,0,.3);border-bottom:1px solid rgba(255,255,255,.06);text-transform:uppercase;letter-spacing:1px}
+.log-code{display:block;padding:8px 12px;overflow-x:auto;font-family:var(--font-mono);font-size:12px;line-height:1.5;background:rgba(0,0,0,.35);color:var(--cream)}
+.hljs{background:transparent!important;color:var(--cream)!important}
+.hljs-keyword{color:#c792ea!important}
+.hljs-string{color:#c3e88d!important}
+.hljs-comment{color:#546e7a!important;font-style:italic}
+.hljs-number{color:#f78c6c!important}
+.hljs-title{color:#82aaff!important}
+.hljs-built_in{color:#ffcb6b!important}
+.hljs-type{color:#ffcb6b!important}
+.hljs-meta{color:#89ddff!important}
+.hljs-attr{color:#c792ea!important}
+.hljs-params{color:#eeffff!important}
+.hljs-literal{color:#f78c6c!important}
+.md-inline{display:inline;padding:1px 4px;font-family:var(--font-mono);font-size:.92em;color:var(--gold-bright);background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08)}
+
+/* 用量柱状图 */
+.usage-chart{display:flex;align-items:flex-end;gap:6px;padding:8px 0;min-height:72px}
+.usage-bar-col{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+.usage-bar{width:100%;max-width:36px;background:linear-gradient(180deg,var(--gold),var(--gold-dark));border:1px solid var(--gold-deep);box-shadow:inset 0 2px 0 rgba(255,255,255,.3);transition:height .3s ease;position:relative;min-height:4px}
+.usage-bar-num{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:var(--font-pixel);font-size:8px;color:var(--text-light)}
+.usage-bar-label{font-family:var(--font-pixel);font-size:8px;color:var(--text-light)}
+.set-themes{display:flex;flex-direction:column;gap:3px}

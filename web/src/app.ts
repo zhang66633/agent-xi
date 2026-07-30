@@ -25,6 +25,7 @@ import { ToolConfirmDialog } from './ui/tool_confirm';
 import { MarketView } from './ui/market';
 import { SettingsView } from './ui/settings';
 import { AttachmentManager } from './ui/attachments';
+import { FileTree } from './ui/filetree';
 import type { Agent, AttachmentMeta, LogEntry, Quest, LogType } from './types';
 
 // 后端轮询间隔
@@ -42,6 +43,7 @@ export class App {
   private market!: MarketView;
   private settings!: SettingsView;
   private attach!: AttachmentManager;
+  private filetree!: FileTree;
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private currentAgentId: string | null = null;
@@ -110,6 +112,16 @@ export class App {
       });
     });
     this.cmd.setAllowEmptySend(() => this.attach.pendingCount > 0);
+
+    // 文件树：点击文件 → 填充到输入框
+    this.filetree = new FileTree();
+    this.filetree.onSelect((path) => {
+      const input = document.getElementById('command-input');
+      if (input instanceof HTMLInputElement) {
+        input.value = `请读取文件 ${path}`;
+        input.focus();
+      }
+    });
 
     this.router.onChange((view) => {
       if (view === 'market') void this.market.refresh();
