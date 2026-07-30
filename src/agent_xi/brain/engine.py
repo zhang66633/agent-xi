@@ -94,9 +94,10 @@ class Brain:
         self._data_dir: Any = None
         self._session_id: str = ""
 
-        # Phase 4: 权限拒绝追踪 + 临时白名单
+        # Phase 4: 权限拒绝追踪 + 临时白名单 + 模式过滤
         self._permission_denials: list[dict[str, Any]] = []
         self._allowed_tools: set[str] = set()
+        self._mode_tools: list[str] | None = None  # None=全部, list=白名单
 
         # Phase 4: 用量追踪回调（外部注入）
         self._usage_callback: Callable[[str, str, int, int], None] | None = None
@@ -167,8 +168,12 @@ class Brain:
                         else skill_context
                     )
 
-            # 3. 获取工具定义
-            tool_definitions = self._tools.to_definitions() if self._tools else []
+            # 3. 获取工具定义（按模式过滤）
+            all_defs = self._tools.to_definitions() if self._tools else []
+            if self._mode_tools is not None:
+                tool_definitions = [d for d in all_defs if d.name in self._mode_tools]
+            else:
+                tool_definitions = all_defs
 
             # 4. 注入权限拒绝历史（让 LLM 知道用户偏好）
             denial_hint = self._build_denial_hint()

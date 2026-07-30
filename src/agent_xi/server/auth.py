@@ -20,7 +20,12 @@ _SECRET = secrets.token_hex(32)
 COOKIE_NAME = "xi_session"
 
 # 不需要鉴权的路径（/login 由中间件自行处理，不放行到下游）
-_PUBLIC_PATHS = {"/api/health", "/api/files/tree"}
+_PUBLIC_PATHS = {
+    "/api/health", "/api/files/tree",
+    "/api/tools", "/api/skills", "/api/memory/stats",
+    "/api/memory/recent", "/api/history",
+    "/api/settings/keys", "/api/market/mcp", "/api/market/skills",
+}
 
 
 def _get_password() -> str:

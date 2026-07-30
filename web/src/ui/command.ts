@@ -13,6 +13,8 @@ const SLASH_COMMANDS: CmdEntry[] = [
   { name: '/clear', desc: '清空对话' },
   { name: '/undo', desc: '撤销上一轮回复' },
   { name: '/history', desc: '查看对话轮次' },
+  { name: '/mode ', desc: '切换模式 plan/code/review' },
+  { name: '/agent ', desc: '启动子Agent(planner/coder/reviewer)' },
   { name: '/status', desc: '系统状态总览' },
   { name: '/memory', desc: '记忆统计' },
   { name: '/skills', desc: '已装技能列表' },

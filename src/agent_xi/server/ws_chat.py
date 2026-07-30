@@ -415,9 +415,49 @@ async def _handle_command(
             lines = [
                 f"Provider: {provider} | Model: {model}",
                 f"工具: {tools_count} 个 | 对话: {brain.turn_count if brain else 0} 轮",
-                f"情景记忆: {ep} 条 | 画像: {'已建立' if profile else '未建立'}",
+                f"模式: {brain._mode_tools and '白名单' or '全工具'} | 情景记忆: {ep} 条",
+                f"画像: {'已建立' if profile else '未建立'}",
             ]
             await ws.send_json({"type": "system", "message": "\n".join(lines)})
+
+        case "/agent":
+            agent_type = parts[1].split()[0].strip() if len(parts) > 1 else ""
+            task = parts[1][len(agent_type):].strip() if len(parts) > 1 and len(parts[1]) > len(agent_type) else ""
+            if not agent_type or agent_type not in ("planner", "coder", "reviewer"):
+                await ws.send_json({"type":"system","message":"用法: /agent <planner|coder|reviewer> <任务描述>"})
+                return
+            if not brain:
+                await ws.send_json({"type":"system","message":"会话未初始化"})
+                return
+            await ws.send_json({"type":"system","message":f"启动 {agent_type.upper()} 子Agent处理: {task[:80]}"})
+            try:
+                from ..agents.base import AgentContext
+                from ..agents.planner import Planner
+                from ..agents.coder import Coder
+                from ..agents.reviewer import Reviewer
+                agent_cls = {"planner": Planner, "coder": Coder, "reviewer": Reviewer}[agent_type]
+                agent = agent_cls(brain._client)
+                result = await agent.execute(AgentContext(task=task or "分析当前项目"))
+                if result.success:
+                    await ws.send_json({"type":"system","message":f"{agent_type.upper()} 完成:\n{result.output[:2000]}"})
+                else:
+                    await ws.send_json({"type":"system","message":f"{agent_type.upper()} 失败: {result.error}"})
+            except Exception as e:
+                await ws.send_json({"type":"error","message":f"子Agent异常: {e}"})
+
+        case "/mode":
+            mode_name = parts[1].strip().lower() if len(parts) > 1 else ""
+            modes = {
+                "plan": ["read_file", "list_dir", "grep", "glob", "git_log", "git_diff", "web_search", "get_time", "calculator"],
+                "code": None,  # 全工具
+                "review": ["read_file", "grep", "glob", "git_diff", "git_log", "list_dir"],
+            }
+            if mode_name not in modes:
+                await ws.send_json({"type":"system","message":"用法: /mode <plan|code|review>\nplan=只读规划 code=全部 review=只读审查"})
+                return
+            if brain:
+                brain._mode_tools = modes[mode_name]
+            await ws.send_json({"type":"system","message":f"已切换模式: {mode_name.upper()}"})
 
         case "/search":
             query_text = parts[1].strip() if len(parts) > 1 else ""
@@ -465,9 +505,11 @@ async def _handle_command(
                 "type": "system",
                 "message": (
                     "/clear（清空）/undo（撤销）/history（轮次）\n"
+                    "/mode <plan|code|review>（模式切换）\n"
+                    "/agent <planner|coder|reviewer> <任务>（子Agent）\n"
                     "/status（状态）/memory（记忆）/skills（技能）\n"
-                    "/search <关键词>（联网搜索）/remember <内容>（记住）\n"
-                    "/allow <工具>（放行）/export（导出）/help（帮助）"
+                    "/search（搜索）/remember（记住）/allow（放行）\n"
+                    "/export（导出）/help（帮助）"
                 ),
             })
 
