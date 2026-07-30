@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -89,6 +92,26 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
             data_dir=data_dir,
             embedding_client=embedding_client,
         )
+        # 从文件系统加载 SKILL.md（对标 cc-haha skills/loadSkillsDir.ts）
+        from ..skills.loader import discover_skills_from_dir
+        _config_dir = Path(__file__).parent.parent.parent.parent / "config"
+        _fs_skills = discover_skills_from_dir(_config_dir / "skills")
+        for _info in _fs_skills:
+            from ..skills.models import Skill
+            _skill = Skill(
+                id=_info["id"], name=_info["name"],
+                description=_info["description"], steps=_info["steps"],
+                trigger_keywords=_info.get("trigger_keywords", []),
+                category=_info.get("category", ""),
+                tags=_info.get("tags", []),
+            )
+            try:
+                await skill_store.save(_skill)
+            except Exception:
+                pass
+        if _fs_skills:
+            logger.info("从文件系统加载了 %d 个技能", len(_fs_skills))
+
         skill_matcher = SkillMatcher(skill_store)
 
         # System prompt
