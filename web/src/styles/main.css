@@ -2497,8 +2497,9 @@ button,
   border-right: 3px solid var(--wood-darkest);
   box-shadow: inset -3px 0 0 rgba(0,0,0,0.4);
   overflow: hidden;
-  min-width: 180px;
-  max-width: 300px;
+  /* 与 roster-panel 共享左列 */
+  grid-row: 1;
+  grid-column: 1;
 }
 #filetree-container {
   flex: 1;

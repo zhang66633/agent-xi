@@ -33,10 +33,13 @@ export class FileTree {
   /** 切换显隐 */
   toggle(): void {
     this.visible = !this.visible;
+    const roster = document.getElementById('roster-panel');
     if (this.visible) {
+      if (roster) roster.hidden = true;
       this.panel.hidden = false;
       this.load();
     } else {
+      if (roster) roster.hidden = false;
       this.panel.hidden = true;
     }
   }
