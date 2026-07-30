@@ -1,7 +1,6 @@
 """web_search — 网络搜索。SENSITIVE 级别（需要网络访问）。
 
-主搜索引擎：Bing（国内可用）。
-备用：DuckDuckGo HTML（需翻墙）。
+搜索引擎优先级：DuckDuckGo Lite → Bing → DuckDuckGo HTML。
 """
 
 from __future__ import annotations
@@ -71,15 +70,24 @@ class WebSearchTool(Tool):
                 success=False, output="", error="未提供搜索关键词"
             )
 
-        # 优先 Bing，失败则尝试 DuckDuckGo
+        # 优先 DDG Lite（最可靠），次选 Bing，最后 DDG HTML
         results: list[dict[str, str]] = []
         errors: list[str] = []
 
+        # 1. DuckDuckGo Lite（全球通用，结构简单）
         try:
-            results = await self._search_bing(query, num_results)
+            results = await self._search_ddg_lite(query, num_results)
         except Exception as e:
-            errors.append(f"Bing: {e}")
+            errors.append(f"DDG Lite: {e}")
 
+        # 2. Bing（国内可用）
+        if not results:
+            try:
+                results = await self._search_bing(query, num_results)
+            except Exception as e:
+                errors.append(f"Bing: {e}")
+
+        # 3. DuckDuckGo HTML（备用）
         if not results:
             try:
                 results = await self._search_duckduckgo(query, num_results)
@@ -106,6 +114,42 @@ class WebSearchTool(Tool):
             lines.append(f"   链接：{r['url']}\n")
 
         return ToolResult(success=True, output="\n".join(lines))
+
+    # ─── DuckDuckGo Lite 搜索（首选）──────────────────────────────────────────
+
+    async def _search_ddg_lite(
+        self, query: str, num_results: int
+    ) -> list[dict[str, str]]:
+        """通过 DuckDuckGo Lite 搜索（全球通用，无 JS，结构简单）。"""
+        async with httpx.AsyncClient(
+            timeout=_TIMEOUT, follow_redirects=True
+        ) as client:
+            response = await client.get(
+                "https://lite.duckduckgo.com/lite/",
+                params={"q": query},
+                headers=_HEADERS,
+            )
+            response.raise_for_status()
+
+        results: list[dict[str, str]] = []
+        # DDG Lite 结果结构: <a href="url" class="result-link">title</a>...<span class="result-snippet">snippet</span>
+        rows = re.findall(
+            r'<a[^>]*href="([^"]*)"[^>]*class="result-link"[^>]*>(.*?)</a>'
+            r'.*?'
+            r'<span[^>]*class="result-snippet"[^>]*>(.*?)</span>',
+            response.text,
+            re.DOTALL,
+        )
+        for url, title, snippet in rows[:num_results]:
+            clean_title = re.sub(r"<[^>]+>", "", title).strip()
+            clean_snippet = re.sub(r"<[^>]+>", "", snippet).strip()
+            if clean_title:
+                results.append({
+                    "title": clean_title,
+                    "snippet": clean_snippet,
+                    "url": url,
+                })
+        return results
 
     # ─── Bing 搜索 ─────────────────────────────────────────────────────────────
 

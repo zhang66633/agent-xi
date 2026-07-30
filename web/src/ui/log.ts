@@ -23,6 +23,7 @@ export class LogPanel {
   private streamBuffer = '';
   private autoScroll = true;
   private previewModal: Modal | null = null;
+  private _renderTimer: number = 0;
 
   constructor() {
     this.listEl = document.getElementById('log-list')!;
@@ -37,7 +38,7 @@ export class LogPanel {
     this._maybeScroll();
   }
 
-  /** 追加文本到当前流式日志（若无则创建一条 chat 类型） */
+  /** 追加文本到当前流式日志（实时 Markdown 渲染） */
   appendStream(text: string, opts: { type?: LogType; source?: string; time?: string } = {}): void {
     if (!this.currentStreamEl) {
       const entry: LogEntry = {
@@ -51,20 +52,33 @@ export class LogPanel {
       this.currentStreamEl = this._renderEntry(entry);
       this.currentStreamEl.querySelector('.log-text')?.classList.add('typing');
       this.streamBuffer = '';
+      this._renderTimer = 0;
     }
     this.streamBuffer += text;
     const textEl = this.currentStreamEl.querySelector('.log-text');
-    if (textEl) textEl.textContent = this.streamBuffer;
+    if (textEl) {
+      // 节流：每 80ms 渲染一次 Markdown
+      if (!this._renderTimer) {
+        this._renderTimer = window.setTimeout(() => {
+          this._renderTimer = 0;
+          textEl.innerHTML = this._renderRichText(this.streamBuffer);
+          this._maybeScroll();
+        }, 80);
+      }
+    }
     this._maybeScroll();
   }
 
   /** 结束当前流式 */
   finalizeStream(): void {
     if (this.currentStreamEl) {
+      if (this._renderTimer) {
+        clearTimeout(this._renderTimer);
+        this._renderTimer = 0;
+      }
       const textEl = this.currentStreamEl.querySelector('.log-text');
       if (textEl) {
         textEl.classList.remove('typing');
-        // 流式结束后把 ``` 代码块渲染成带样式的代码区
         textEl.innerHTML = this._renderRichText(this.streamBuffer);
       }
       this.currentStreamEl = null;

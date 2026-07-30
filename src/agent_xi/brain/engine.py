@@ -87,6 +87,9 @@ class Brain:
         # Phase 4: 中断支持
         self._abort_event = asyncio.Event()
 
+        # Phase 4: 上下文压缩（延迟创建，避免循环导入）
+        self._compactor: Any = None
+
         # Phase 4: 权限拒绝追踪
         self._permission_denials: list[dict[str, Any]] = []
 
@@ -180,6 +183,10 @@ class Brain:
                         error="操作已被用户中断",
                     )
                     return
+
+                # 上下文压缩检查（首次迭代，token 超 70% 预算时触发）
+                if iteration == 0:
+                    await self._maybe_compact()
 
                 # 构建请求
                 request = self._context.build_request(
@@ -539,6 +546,42 @@ class Brain:
             content=truncated,
             is_error=block.is_error,
         )
+
+    async def _maybe_compact(self) -> None:
+        """检查 token 用量，超阈值时压缩旧消息为摘要。"""
+        from .compactor import ContextCompactor
+        from .tokenizer import count_tools_tokens
+
+        if self._compactor is None:
+            self._compactor = ContextCompactor(
+                llm_client=self._client,
+                max_budget=self._context._max_context_tokens,
+            )
+        # 计算固定开销
+        tools_def = self._tools.to_definitions() if self._tools else []
+        tools_tokens = count_tools_tokens(tools_def)
+        system_tokens = self._compactor._counter.count_text(
+            self._context.system_prompt
+        )
+        fixed_cost = tools_tokens + system_tokens
+
+        if not self._compactor.should_compact(self._history, fixed_cost):
+            return
+
+        result = await self._compactor.compact(self._history)
+        if result:
+            self._history = result["truncated_history"]
+            summary = result["summary"]
+            # 注入摘要到 system prompt
+            self._context.system_prompt = (
+                f"{self._context.system_prompt}\n\n"
+                f"[对话摘要 — 之前的内容已被压缩]\n{summary}"
+            )
+            logger.info(
+                "上下文已压缩: %d 条消息 -> %d 条保留",
+                result["compacted_count"],
+                len(self._history),
+            )
 
     def clear_history(self) -> None:
         """清空对话历史（开始新对话）。"""
