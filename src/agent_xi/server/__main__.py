@@ -56,6 +56,7 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
     from .history_store import SessionStore
     from .session import SessionManager
     from .usage_tracker import UsageTracker
+from ..scheduler import SchedulerRunner, SchedulerStore
 
     async with create_client(settings.llm) as client:
         # 数据目录
@@ -141,6 +142,17 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
         usage_tracker = UsageTracker(data_dir)
         session_mgr._usage_tracker = usage_tracker
 
+        # Scheduler（定时任务系统）
+        scheduler_store = SchedulerStore(data_dir)
+        from ..brain.context import ContextBuilder as _CB
+        from ..brain.engine import Brain as _Brain
+        _sys_prompt = system_prompt
+        def _brain_factory():
+            return _Brain(client=client, context_builder=_CB(system_prompt=_sys_prompt),
+                          memory=memory, tool_registry=registry, skill_matcher=skill_matcher)
+        scheduler = SchedulerRunner(scheduler_store, _brain_factory)
+        await scheduler.start()
+
         # FastAPI app
         app = create_app(session_mgr)
 
@@ -166,6 +178,7 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
         try:
             await server.serve()
         finally:
+            await scheduler.stop()
             await mcp_manager.stop_all()
             skill_store.close()
             await embedding_client.close()

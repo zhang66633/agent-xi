@@ -423,12 +423,35 @@ async def _handle_command(
         case "/agent":
             agent_type = parts[1].split()[0].strip() if len(parts) > 1 else ""
             task = parts[1][len(agent_type):].strip() if len(parts) > 1 and len(parts[1]) > len(agent_type) else ""
-            if not agent_type or agent_type not in ("planner", "coder", "reviewer"):
-                await ws.send_json({"type":"system","message":"用法: /agent <planner|coder|reviewer> <任务描述>"})
+            if not agent_type or agent_type not in ("planner", "coder", "reviewer", "coordinator"):
+                await ws.send_json({"type":"system","message":"用法: /agent <planner|coder|reviewer|coordinator> <任务>"})
                 return
             if not brain:
                 await ws.send_json({"type":"system","message":"会话未初始化"})
                 return
+
+            # Coordinator 走完整 Planner→Coder→Reviewer 链路
+            if agent_type == "coordinator":
+                await ws.send_json({"type":"system","message":f"启动 Coordinator: Planner→Coder→Reviewer"})
+                try:
+                    from ..agents.coordinator import Coordinator
+                    coord = Coordinator(brain._client)
+                    await ws.send_json({"type":"system","message":"[Planner] 拆解方案..."})
+                    result = await coord.run(task or "分析当前项目")
+                    status = result.get("status", "unknown")
+                    plan = result.get("plan", {})
+                    review = result.get("review", {})
+                    steps = len(plan.get("steps", []))
+                    msg = f"Coordinator 完成 ({status})\n"
+                    msg += f"方案: {plan.get('summary','?')[:200]}\n"
+                    msg += f"步骤: {steps} 个\n"
+                    msg += f"审查: {review.get('verdict','?').upper()}"
+                    await ws.send_json({"type":"system","message":msg})
+                except Exception as e:
+                    await ws.send_json({"type":"error","message":f"Coordinator 异常: {e}"})
+                return
+
+            # 单个子Agent
             await ws.send_json({"type":"system","message":f"启动 {agent_type.upper()} 子Agent处理: {task[:80]}"})
             try:
                 from ..agents.base import AgentContext
@@ -444,6 +467,24 @@ async def _handle_command(
                     await ws.send_json({"type":"system","message":f"{agent_type.upper()} 失败: {result.error}"})
             except Exception as e:
                 await ws.send_json({"type":"error","message":f"子Agent异常: {e}"})
+
+        case "/goal":
+            goal_text = parts[1].strip() if len(parts) > 1 else ""
+            if not goal_text or not brain:
+                await ws.send_json({"type":"system","message":"用法: /goal <目标描述>"})
+                return
+            await ws.send_json({"type":"system","message":f"启动 Outer Loop 执行目标: {goal_text[:100]}"})
+            from ..loop import LoopGuard, Orchestrator, LoopState
+            from pathlib import Path as _Path
+            state = LoopState(_Path(".data"))
+            orch = Orchestrator(brain, state, LoopGuard(max_steps=15))
+            try:
+                goal = await orch.run_goal(goal_text)
+                done = sum(1 for s in goal.steps if str(s.status) == 'done')
+                await ws.send_json({"type":"system",
+                    "message": f"目标完成: {done}/{len(goal.steps)} 步 ({goal.status.value})\n{goal.description[:200]}"})
+            except Exception as e:
+                await ws.send_json({"type":"error","message":f"目标执行异常: {e}"})
 
         case "/mode":
             mode_name = parts[1].strip().lower() if len(parts) > 1 else ""
