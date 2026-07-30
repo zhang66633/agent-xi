@@ -589,6 +589,7 @@ html, body {
 
 /* ─── 命令栏 ───────────────────────────────────────────── */
 #command-bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
