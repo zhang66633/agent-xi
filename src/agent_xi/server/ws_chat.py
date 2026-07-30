@@ -449,9 +449,9 @@ async def _handle_command(
                 "type": "system",
                 "message": (
                     "/clear（清空）/undo（撤销）/history（轮次）\n"
-                    "/status（系统状态）/memory（记忆）/skills（技能）\n"
-                    "/remember <内容>（记住）/export（导出对话）\n"
-                    "/help（此帮助）"
+                    "/status（状态）/memory（记忆）/skills（技能）\n"
+                    "/remember <内容>（记住）/allow <工具>（放行）\n"
+                    "/export（导出）/help（帮助）"
                 ),
             })
 
