@@ -65,6 +65,16 @@ export class TabManager {
     }
   }
 
+  /** 重命名标签 */
+  renameTab(id: string, newName: string): void {
+    const tab = this.tabs.find(t => t.id === id);
+    if (tab && newName.trim()) {
+      tab.name = newName.trim().slice(0, 30);
+      this._saveTabs();
+      this.render();
+    }
+  }
+
   /** 切换到指定标签 */
   switchTo(id: string): void {
     if (!this.tabs.find(t => t.id === id)) return;
@@ -104,6 +114,7 @@ export class TabManager {
     // 绑定事件
     this.listEl.querySelectorAll('.tab-item').forEach(el => {
       const clickEl = el as HTMLElement;
+      const tabId = clickEl.dataset.id!;
       clickEl.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         if (target.classList.contains('tab-close')) {
@@ -111,7 +122,35 @@ export class TabManager {
           this.closeTab(target.dataset.close!);
           return;
         }
-        this.switchTo(clickEl.dataset.id!);
+        this.switchTo(tabId);
+      });
+      // 双击改名
+      clickEl.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        const nameEl = clickEl.querySelector('.tab-name') as HTMLElement;
+        if (!nameEl) return;
+        const oldName = this.tabs.find(t => t.id === tabId)?.name || '';
+        const input = document.createElement('input');
+        input.value = oldName;
+        input.className = 'tab-rename-input';
+        input.maxLength = 30;
+        nameEl.replaceWith(input);
+        input.focus();
+        input.select();
+        const commit = () => {
+          const newName = input.value.trim() || oldName;
+          const span = document.createElement('span');
+          span.className = 'tab-name';
+          span.textContent = newName;
+          span.title = newName;
+          input.replaceWith(span);
+          this.renameTab(tabId, newName);
+        };
+        input.addEventListener('blur', commit);
+        input.addEventListener('keydown', (ke) => {
+          if (ke.key === 'Enter') commit();
+          if (ke.key === 'Escape') { input.value = oldName; commit(); }
+        });
       });
     });
   }

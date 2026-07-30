@@ -2589,3 +2589,4 @@ button,
 .tab-close:hover{color:#fff;background:var(--c-error)}
 #tab-new{width:28px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-light);background:transparent;border:none;border-left:1px solid #000;cursor:pointer;flex-shrink:0}
 #tab-new:hover{color:var(--gold-bright);background:var(--wood-mid)}
+.tab-rename-input{width:100px;padding:1px 4px;font-family:var(--font-pixel);font-size:10px;color:var(--gold-bright);background:var(--wood-darkest);border:1px solid var(--gold-deep);outline:none}
