@@ -90,6 +90,10 @@ class Brain:
         # Phase 4: 上下文压缩（延迟创建，避免循环导入）
         self._compactor: Any = None
 
+        # Phase 4: 工具大结果存盘
+        self._data_dir: Any = None
+        self._session_id: str = ""
+
         # Phase 4: 权限拒绝追踪
         self._permission_denials: list[dict[str, Any]] = []
 
@@ -530,12 +534,27 @@ class Brain:
             arguments=arguments,
         )
 
-    @staticmethod
-    def _truncate_result(block: ToolResultBlock) -> ToolResultBlock:
-        """截断工具输出（防止历史膨胀）。保留头尾。"""
+    def _truncate_result(self, block: ToolResultBlock) -> ToolResultBlock:
+        """截断工具输出（防止历史膨胀）。大结果存盘返回预览。"""
         content = block.content
         if len(content) <= _MAX_TOOL_OUTPUT_CHARS:
             return block
+
+        # 尝试存盘
+        if self._data_dir and self._session_id:
+            from ..server.tool_storage import store_tool_result
+            preview = store_tool_result(
+                self._data_dir, self._session_id,
+                "unknown", content,
+            )
+            if preview:
+                return ToolResultBlock(
+                    tool_use_id=block.tool_use_id,
+                    content=preview,
+                    is_error=block.is_error,
+                )
+
+        # 截断 fallback
         truncated = (
             content[:_MAX_TOOL_OUTPUT_CHARS // 2]
             + f"\n\n... [截断 {len(content) - _MAX_TOOL_OUTPUT_CHARS} 字符] ...\n\n"

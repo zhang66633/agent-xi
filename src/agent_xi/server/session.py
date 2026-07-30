@@ -95,6 +95,12 @@ class SessionManager:
         )
         session.brain = self._create_brain(session)
 
+        # Phase 4: 工具大结果存盘所需
+        if session.brain:
+            from pathlib import Path
+            session.brain._data_dir = Path(".data")
+            session.brain._session_id = session.id
+
         # 从磁盘恢复历史
         restored = False
         if self._store and session_id and session.brain:
