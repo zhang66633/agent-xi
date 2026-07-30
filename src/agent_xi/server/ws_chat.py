@@ -107,6 +107,18 @@ async def handle_ws_chat(
 
             msg_type = msg.get("type", "")
 
+            # ─── ping/pong 心跳 ───
+            if msg_type == "ping":
+                await ws.send_json({"type": "pong"})
+                continue
+
+            # ─── 中断 ───
+            if msg_type == "interrupt":
+                if brain:
+                    brain.interrupt()
+                await ws.send_json({"type": "interrupted"})
+                continue
+
             # ─── 工具确认回复 ───
             if msg_type == "confirm_tool":
                 confirm_result["allowed"] = msg.get("allowed", False)

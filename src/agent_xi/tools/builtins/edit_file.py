@@ -1,15 +1,29 @@
 """Edit 工具 — 精确字符串替换编辑。
 
-对标 Claude Code 的 Edit 工具。
-读文件 → old_string 精确匹配 → 替换为 new_string → 写回。
+对标 Claude Code 的 Edit 工具（含 FILE_UNEXPECTEDLY_MODIFIED_ERROR）。
+读文件 → 检查 mtime 冲突 → old_string 精确匹配 → 替换 → 写回。
 """
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
 from ..base import SecurityLevel, Tool, ToolResult
+
+# 文件读取时间戳追踪（跨工具共享：read_file 记录，edit_file 检查）
+_read_timestamps: dict[str, float] = {}
+
+
+def record_file_read(file_path: str) -> None:
+    """记录文件读取时间戳（供 edit_file 冲突检测）。"""
+    _read_timestamps[str(Path(file_path).resolve())] = time.time()
+
+
+def clear_read_records() -> None:
+    """清空读取记录（会话重置时调用）。"""
+    _read_timestamps.clear()
 
 
 class EditFileTool(Tool):
@@ -88,6 +102,26 @@ class EditFileTool(Tool):
                 success=False, output="", error=f"文件不存在: {file_path}",
             )
 
+        # 冲突检测：文件在上次读取后被外部修改过
+        resolved = str(path)
+        if resolved in _read_timestamps:
+            try:
+                current_mtime = path.stat().st_mtime
+                read_time = _read_timestamps[resolved]
+                if current_mtime > read_time + 1:  # 1 秒容差
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error=(
+                            f"文件已被外部修改: {file_path}\n"
+                            f"上次读取: {time.strftime('%H:%M:%S', time.localtime(read_time))}\n"
+                            f"当前修改: {time.strftime('%H:%M:%S', time.localtime(current_mtime))}\n"
+                            "请重新读取文件内容后再编辑。"
+                        ),
+                    )
+            except OSError:
+                pass
+
         try:
             content = path.read_text(encoding="utf-8")
         except Exception as e:
@@ -101,9 +135,11 @@ class EditFileTool(Tool):
             return ToolResult(
                 success=False,
                 output="",
-                error=f"未找到 old_string 匹配项。"
-                      f"\n提示：请确保字符串精确匹配（含缩进、空行、引号）。"
-                      f"\n文件路径: {file_path}",
+                error=(
+                    "未找到 old_string 匹配项。"
+                    "\n提示：请确保字符串精确匹配（含缩进、空行、引号）。"
+                    f"\n文件路径: {file_path}"
+                ),
             )
 
         if replace_all:
@@ -119,6 +155,9 @@ class EditFileTool(Tool):
             return ToolResult(
                 success=False, output="", error=f"无法写入文件: {e}",
             )
+
+        # 更新读取记录
+        _read_timestamps[resolved] = time.time()
 
         return ToolResult(
             success=True,

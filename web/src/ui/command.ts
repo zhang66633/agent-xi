@@ -5,14 +5,17 @@
 import type { LogType } from '../types';
 
 type CommandHandler = (text: string) => void;
+type InterruptHandler = () => void;
 
 export class CommandInput {
   private inputEl: HTMLInputElement;
   private execBtn: HTMLButtonElement;
   private handler: CommandHandler | null = null;
+  private interruptHandler: InterruptHandler | null = null;
   private history: string[] = [];
   private historyIdx = -1;
   private allowEmptySend: (() => boolean) | null = null;
+  private _mode: 'run' | 'stop' = 'run';
 
   constructor() {
     const inputEl = document.getElementById('command-input');
@@ -28,6 +31,24 @@ export class CommandInput {
   onCommand(handler: CommandHandler): void {
     this.handler = handler;
   }
+
+  onInterrupt(handler: InterruptHandler): void {
+    this.interruptHandler = handler;
+  }
+
+  /** 切换按钮模式：run → 执行, stop → 停止 */
+  setMode(mode: 'run' | 'stop'): void {
+    this._mode = mode;
+    if (mode === 'stop') {
+      this.execBtn.textContent = '停止';
+      this.execBtn.classList.add('btn-stop');
+    } else {
+      this.execBtn.textContent = '执行';
+      this.execBtn.classList.remove('btn-stop');
+    }
+  }
+
+  get mode(): 'run' | 'stop' { return this._mode; }
 
   /** 设置"允许空文本发送"谓词（有待发附件时返回 true） */
   setAllowEmptySend(predicate: () => boolean): void {
@@ -57,6 +78,11 @@ export class CommandInput {
   }
 
   private _exec(): void {
+    // 停止模式：触发中断
+    if (this._mode === 'stop') {
+      this.interruptHandler?.();
+      return;
+    }
     const text = this.inputEl.value.trim();
     const canEmpty = this.allowEmptySend?.() ?? false;
     if (!text && !canEmpty) return;

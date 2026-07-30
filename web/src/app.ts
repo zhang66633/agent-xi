@@ -249,6 +249,16 @@ export class App {
     this.cmd.onCommand((text) => {
       void this._handleCommand(text);
     });
+    // 中断按钮
+    this.cmd.onInterrupt(() => {
+      this.ws.sendInterrupt();
+      this.log.append({
+        id: `int-${Date.now()}`,
+        time: this._now(),
+        type: 'warn',
+        text: '[中断] 已发送中止请求',
+      });
+    });
   }
 
   /** 处理一次发送：斜杠命令直通；聊天消息先上传附件再携带发送 */
@@ -304,6 +314,7 @@ export class App {
       attachments: metas,
     });
     this.ws.sendChat(text, metas);
+    this.cmd.setMode('stop');
   }
 
   /** 还原文本到命令输入框（上传失败时避免丢用户输入） */
@@ -352,15 +363,27 @@ export class App {
 
     this.ws.on('done', () => {
       this.log.finalizeStream();
-      // 完成当前运行中的工具任务
+      this.cmd.setMode('run');
       if (this.currentRunningTool) {
         this._updateQuest(this.currentRunningTool, 'done', 100);
         this.currentRunningTool = null;
       }
     });
 
+    this.ws.on('interrupted', () => {
+      this.log.finalizeStream();
+      this.cmd.setMode('run');
+      this.log.append({
+        id: `int-${Date.now()}`,
+        time: this._now(),
+        type: 'system',
+        text: '[已中断]',
+      });
+    });
+
     this.ws.on('error', (msg) => {
       this.log.finalizeStream();
+      this.cmd.setMode('run');
       this.log.append({
         id: `err-${Date.now()}`,
         time: this._now(),

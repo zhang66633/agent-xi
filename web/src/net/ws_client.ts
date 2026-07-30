@@ -135,6 +135,11 @@ export class WsClient {
     this._send({ type: 'confirm_tool', allowed });
   }
 
+  /** 中止当前操作 */
+  sendInterrupt(): void {
+    this._send({ type: 'interrupt' });
+  }
+
   /** 发送命令 */
   sendCommand(content: string): void {
     this._send({ type: 'command', content });

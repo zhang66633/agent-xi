@@ -643,6 +643,18 @@ html, body {
   box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.3);
 }
 
+/* 停止按钮（中断） */
+.btn-exec.btn-stop {
+  background: var(--c-error);
+  color: #fff;
+  border-color: var(--c-error-deep);
+  animation: pulse-stop 1s steps(2) infinite;
+}
+@keyframes pulse-stop {
+  0%,100% { opacity: 1; }
+  50% { opacity: .7; }
+}
+
 #command-help {
   padding: 4px 12px 6px;
   font-family: var(--font-pixel);

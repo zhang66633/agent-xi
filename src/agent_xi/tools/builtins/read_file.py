@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ..base import SecurityLevel, Tool, ToolResult
+from .edit_file import record_file_read
 
 # 文件最大读取大小（字符数）— 50000 对标 Claude Code
 _MAX_FILE_SIZE = 50000
@@ -129,6 +130,9 @@ class ReadFileTool(Tool):
             f"[{path.name}] 共 {total_lines} 行，"
             f"显示第 {start_idx + 1}-{end_line} 行\n"
         )
+        # 记录读取时间戳（供 edit_file 冲突检测）
+        record_file_read(str(path))
+
         return ToolResult(
             success=True,
             output=header + output,
