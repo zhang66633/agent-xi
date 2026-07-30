@@ -267,7 +267,18 @@ def _event_to_ws_message(event: Any) -> dict[str, Any] | None:
             return {"type": "error", "message": event.error}
 
         case StreamEventType.DONE:
-            # Brain 内部的 DONE 不直接转发，由外层统一发
+            # DONE 携带 usage → 转为 usage_update
+            if event.usage:
+                return {
+                    "type": "usage_update",
+                    "input_tokens": event.usage.input_tokens,
+                    "output_tokens": event.usage.output_tokens,
+                    "cost_usd": round(
+                        (event.usage.input_tokens / 1_000_000) * 0.27
+                        + (event.usage.output_tokens / 1_000_000) * 1.10,
+                        6,
+                    ),
+                }
             return None
 
         case _:

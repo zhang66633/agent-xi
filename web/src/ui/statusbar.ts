@@ -12,6 +12,7 @@ export class StatusBar {
   private seasonEl: HTMLElement;
   private clockEl: HTMLElement;
   private bottomCtxEl: HTMLElement;
+  private usageEl: HTMLElement;
   private clockTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
@@ -21,6 +22,7 @@ export class StatusBar {
     this.seasonEl = this._req('season-text');
     this.clockEl = this._req('clock-text');
     this.bottomCtxEl = this._req('bottom-context');
+    this.usageEl = this._req('bottom-usage');
   }
 
   start(): void {
@@ -45,6 +47,13 @@ export class StatusBar {
   /** 设置季节文本（如 "夏季 7月21日"；默认由时钟按真实日期驱动） */
   setSeason(text: string): void {
     this.seasonEl.textContent = text;
+  }
+
+  /** 设置用量显示 */
+  setUsage(input: number, output: number, cost: number): void {
+    const i = input >= 1000 ? `${(input/1000).toFixed(0)}K` : String(input);
+    const o = output >= 1000 ? `${(output/1000).toFixed(0)}K` : String(output);
+    this.usageEl.textContent = `in:${i} | out:${o} | $${cost.toFixed(4)}`;
   }
 
   /** 设置底部上下文（如 "Agent Xi 内核 · localhost:9731"） */

@@ -186,6 +186,13 @@ export class WsClient {
     }
   }
 
+  /** 用新的 session_id 重连 */
+  reconnectWith(sessionId: string): void {
+    this.disconnect();
+    this._saveSessionId(sessionId);
+    this.connect();
+  }
+
   /** 清除本地会话 id（下次连接将开启全新会话） */
   resetSession(): void {
     try {

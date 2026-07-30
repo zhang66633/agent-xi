@@ -26,6 +26,7 @@ import { MarketView } from './ui/market';
 import { SettingsView } from './ui/settings';
 import { AttachmentManager } from './ui/attachments';
 import { FileTree } from './ui/filetree';
+import { TabManager } from './ui/tabs';
 import type { Agent, AttachmentMeta, LogEntry, Quest, LogType } from './types';
 
 // 后端轮询间隔
@@ -44,6 +45,7 @@ export class App {
   private settings!: SettingsView;
   private attach!: AttachmentManager;
   private filetree!: FileTree;
+  private tabs!: TabManager;
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private currentAgentId: string | null = null;
@@ -121,6 +123,28 @@ export class App {
         input.value = `请读取文件 ${path}`;
         input.focus();
       }
+    });
+
+    // 多会话标签页
+    this.tabs = new TabManager();
+    // 确保至少有一个初始标签
+    if (!this.tabs.active) {
+      const initialId = this.ws.sessionId || crypto.randomUUID();
+      this.tabs.addTab(initialId, '默认会话');
+      this.tabs.switchTo(initialId);
+    }
+    this.tabs.onTabSwitch((tabId) => {
+      this.ws.reconnectWith(tabId);
+      this.log.clear();
+    });
+    this.tabs.onTabNew(() => {
+      const id = crypto.randomUUID();
+      this.ws.reconnectWith(id);
+      this.log.clear();
+      return id;
+    });
+    this.tabs.onTabClose((tabId) => {
+      // 会话历史已在每次对话后落盘，无需额外清理
     });
 
     // 全局快捷键
@@ -324,6 +348,10 @@ export class App {
     });
     this.ws.sendChat(text, metas);
     this.cmd.setMode('stop');
+    // 首次消息 → 更新标签名
+    if (text && this.tabs.active) {
+      this.tabs.updateName(this.tabs.active, text);
+    }
   }
 
   /** 还原文本到命令输入框（上传失败时避免丢用户输入） */
@@ -381,9 +409,17 @@ export class App {
       }
     });
 
+    this.ws.on('usage_update', (msg: any) => {
+      const input = msg.input_tokens ?? 0;
+      const output = msg.output_tokens ?? 0;
+      const cost = msg.cost_usd ?? 0;
+      this.status.setUsage(input, output, cost);
+    });
+
     this.ws.on('interrupted', () => {
       this.log.finalizeStream();
       this.cmd.setMode('run');
+      document.title = 'Agent Xi';
       this.log.append({
         id: `int-${Date.now()}`,
         time: this._now(),

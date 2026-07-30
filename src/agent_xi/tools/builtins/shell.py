@@ -6,12 +6,24 @@ import asyncio
 import platform
 from typing import Any
 
-from ..base import SecurityLevel, Tool, ToolResult
+from ..base import PermissionBehavior, PermissionDecision, SecurityLevel, Tool, ToolResult
 
 # 命令输出最大长度（防止刷屏）
 _MAX_OUTPUT_LENGTH = 4000
 # 命令执行超时（秒）
 _TIMEOUT = 30
+
+# 只读命令前缀（自动 SAFE，跳过确认）
+_READ_ONLY_COMMANDS = [
+    "ls", "dir", "cat", "head", "tail", "wc", "stat",
+    "grep", "rg", "find", "locate", "which", "where",
+    "echo", "printf", "date", "pwd", "whoami", "hostname",
+    "uname", "env", "printenv", "type", "file", "du", "df",
+    "git log", "git diff", "git status", "git branch",
+    "git show", "git tag", "git remote", "git config",
+    "git stash list", "python --version", "python -V",
+    "node --version", "npm --version", "pip list", "pip show",
+]
 
 
 class ExecuteShellTool(Tool):
@@ -45,6 +57,24 @@ class ExecuteShellTool(Tool):
     @property
     def security_level(self) -> SecurityLevel:
         return SecurityLevel.DANGEROUS
+
+    async def check_permission(self, **kwargs: Any) -> PermissionDecision:
+        """只读命令自动放行。"""
+        command = str(kwargs.get("command", "")).strip()
+        for prefix in _READ_ONLY_COMMANDS:
+            if command.startswith(prefix):
+                return PermissionDecision(
+                    behavior=PermissionBehavior.ALLOW,
+                    reason="read_only_command",
+                )
+        return await super().check_permission(**kwargs)
+
+    def tool_prompt(self) -> str:
+        return (
+            "- **execute_shell**: 执行 shell 命令。"
+            "只读命令（ls/cat/grep/find/git log 等）自动执行无需确认。"
+            "其他命令需要用户确认。"
+        )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         command = kwargs.get("command", "")
