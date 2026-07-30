@@ -658,6 +658,16 @@ html, body {
 .cmd-dropdown{position:absolute;bottom:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:var(--wood-darkest);border:2px solid var(--gold-deep);box-shadow:0 -4px 12px rgba(0,0,0,.6);z-index:100;margin-bottom:2px}
 .cmd-dropdown-item{padding:5px 10px;font-family:var(--font-mono);font-size:11px;color:var(--text-on-dark);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
 .cmd-dropdown-item:hover,.cmd-dropdown-item.active{background:rgba(244,208,63,.12);color:var(--gold-bright)}
+
+/* 日志搜索 */
+.log-search-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--wood-darkest);border-bottom:2px solid var(--gold-deep)}
+.log-search-input{flex:1;padding:4px 8px;font-family:var(--font-mono);font-size:12px;color:var(--cream);background:rgba(0,0,0,.4);border:1px solid var(--gold-deep);outline:none}
+.log-search-input:focus{border-color:var(--gold-bright);box-shadow:0 0 6px rgba(244,208,63,.3)}
+.log-search-count{font-family:var(--font-pixel);font-size:10px;color:var(--text-light);min-width:40px;text-align:center}
+.log-search-btn{padding:2px 8px;font-size:12px;color:var(--gold);background:var(--wood-mid);border:1px solid var(--wood-darkest);cursor:pointer}
+.log-search-btn:hover{color:var(--gold-bright);background:var(--wood-warm)}
+.log-search-hit{background:rgba(244,208,63,.2)!important;border-radius:2px}
+.log-search-active{background:rgba(244,208,63,.45)!important;outline:2px solid var(--gold-bright)}
 .cmd-dropdown-item .cmd-name{color:var(--gold-bright)}
 .cmd-dropdown-item .cmd-desc{color:var(--text-light);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @keyframes pulse-stop {
@@ -2609,3 +2619,8 @@ button,
 #tab-new{width:28px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-light);background:transparent;border:none;border-left:1px solid #000;cursor:pointer;flex-shrink:0}
 #tab-new:hover{color:var(--gold-bright);background:var(--wood-mid)}
 .tab-rename-input{width:100px;padding:1px 4px;font-family:var(--font-pixel);font-size:10px;color:var(--gold-bright);background:var(--wood-darkest);border:1px solid var(--gold-deep);outline:none}
+
+/* 标签右键菜单 */
+.tab-context-menu{position:fixed;z-index:9999;background:var(--wood-darkest);border:2px solid var(--gold-deep);box-shadow:4px 4px 0 rgba(0,0,0,.6);min-width:140px;padding:2px 0}
+.tab-menu-item{padding:6px 14px;font-family:var(--font-pixel);font-size:10px;color:var(--text-on-dark);cursor:pointer;white-space:nowrap;transition:background .1s}
+.tab-menu-item:hover{background:rgba(244,208,63,.12);color:var(--gold-bright)}

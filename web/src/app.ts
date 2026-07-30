@@ -162,6 +162,9 @@ export class App {
         e.preventDefault();
         this.log.clear();
         this.ws.sendCommand('/clear');
+      } else if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        this.log.toggleSearch();
       }
     });
 

@@ -24,6 +24,9 @@ export class LogPanel {
   private autoScroll = true;
   private previewModal: Modal | null = null;
   private _renderTimer: number = 0;
+  private searchBar: HTMLElement | null = null;
+  private searchIdx = -1;
+  private searchHits: HTMLElement[] = [];
 
   constructor() {
     this.listEl = document.getElementById('log-list')!;
@@ -107,6 +110,81 @@ export class LogPanel {
     this.listEl.innerHTML = '';
     this.currentStreamEl = null;
     this.streamBuffer = '';
+    this._removeSearchBar();
+  }
+
+  /** 切换搜索栏 */
+  toggleSearch(): void {
+    if (this.searchBar) { this._removeSearchBar(); return; }
+    this._showSearchBar();
+  }
+
+  private _showSearchBar(): void {
+    this.searchBar = document.createElement('div');
+    this.searchBar.className = 'log-search-bar';
+    this.searchBar.innerHTML = `
+      <input class="log-search-input" placeholder="搜索日志..." autocomplete="off" />
+      <span class="log-search-count"></span>
+      <button class="log-search-btn" title="上一个">▲</button>
+      <button class="log-search-btn" title="下一个">▼</button>
+      <button class="log-search-btn" title="关闭">×</button>
+    `;
+    const panel = this.listEl.parentElement!;
+    panel.insertBefore(this.searchBar, this.listEl);
+
+    const input = this.searchBar.querySelector('.log-search-input') as HTMLInputElement;
+    const count = this.searchBar.querySelector('.log-search-count') as HTMLElement;
+    const btnPrev = this.searchBar.querySelectorAll('.log-search-btn')[0] as HTMLElement;
+    const btnNext = this.searchBar.querySelectorAll('.log-search-btn')[1] as HTMLElement;
+    const btnClose = this.searchBar.querySelectorAll('.log-search-btn')[2] as HTMLElement;
+
+    const doSearch = () => {
+      const q = input.value.toLowerCase();
+      // 清除旧高亮
+      this.listEl.querySelectorAll('.log-search-hit').forEach(el => el.classList.remove('log-search-hit'));
+      this.searchHits = [];
+      this.searchIdx = -1;
+      if (!q) { count.textContent = ''; return; }
+      this.listEl.querySelectorAll('.log-text,.log-diff-line').forEach(el => {
+        const text = el.textContent?.toLowerCase() || '';
+        if (text.includes(q)) {
+          this.searchHits.push(el as HTMLElement);
+          el.classList.add('log-search-hit');
+        }
+      });
+      count.textContent = this.searchHits.length ? `1/${this.searchHits.length}` : '无';
+      if (this.searchHits.length > 0) this._navSearch(1);
+    };
+
+    const nav = (dir: 1 | -1) => {
+      if (!this.searchHits.length) return;
+      this._navSearch(dir);
+      count.textContent = `${this.searchIdx + 1}/${this.searchHits.length}`;
+    };
+
+    input.addEventListener('input', doSearch);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') nav(1); if (e.key === 'Escape') this._removeSearchBar(); });
+    btnPrev.addEventListener('click', () => nav(-1));
+    btnNext.addEventListener('click', () => nav(1));
+    btnClose.addEventListener('click', () => this._removeSearchBar());
+    input.focus();
+  }
+
+  private _navSearch(dir: 1 | -1): void {
+    if (!this.searchHits.length) return;
+    this.searchHits.forEach(el => el.classList.remove('log-search-active'));
+    this.searchIdx = (this.searchIdx + dir + this.searchHits.length) % this.searchHits.length;
+    this.searchHits[this.searchIdx].classList.add('log-search-active');
+    this.searchHits[this.searchIdx].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  private _removeSearchBar(): void {
+    this.listEl.querySelectorAll('.log-search-hit,.log-search-active').forEach(el => {
+      el.classList.remove('log-search-hit', 'log-search-active');
+    });
+    if (this.searchBar) { this.searchBar.remove(); this.searchBar = null; }
+    this.searchHits = [];
+    this.searchIdx = -1;
   }
 
   // ─── 内部 ─────────────────────────────────────────────

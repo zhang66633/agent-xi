@@ -127,30 +127,13 @@ export class TabManager {
       // 双击改名
       clickEl.addEventListener('dblclick', (e) => {
         e.stopPropagation();
-        const nameEl = clickEl.querySelector('.tab-name') as HTMLElement;
-        if (!nameEl) return;
-        const oldName = this.tabs.find(t => t.id === tabId)?.name || '';
-        const input = document.createElement('input');
-        input.value = oldName;
-        input.className = 'tab-rename-input';
-        input.maxLength = 30;
-        nameEl.replaceWith(input);
-        input.focus();
-        input.select();
-        const commit = () => {
-          const newName = input.value.trim() || oldName;
-          const span = document.createElement('span');
-          span.className = 'tab-name';
-          span.textContent = newName;
-          span.title = newName;
-          input.replaceWith(span);
-          this.renameTab(tabId, newName);
-        };
-        input.addEventListener('blur', commit);
-        input.addEventListener('keydown', (ke) => {
-          if (ke.key === 'Enter') commit();
-          if (ke.key === 'Escape') { input.value = oldName; commit(); }
-        });
+        this._startRename(tabId, clickEl);
+      });
+      // 右键菜单
+      clickEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._showContextMenu(e.clientX, e.clientY, tabId);
       });
     });
   }
@@ -180,5 +163,74 @@ export class TabManager {
 
   private _esc(s: string): string {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /** 双击改名 */
+  private _startRename(tabId: string, el: HTMLElement): void {
+    const nameEl = el.querySelector('.tab-name') as HTMLElement;
+    if (!nameEl) return;
+    const oldName = this.tabs.find(t => t.id === tabId)?.name || '';
+    const input = document.createElement('input');
+    input.value = oldName;
+    input.className = 'tab-rename-input';
+    input.maxLength = 30;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+    const commit = () => {
+      const newName = input.value.trim() || oldName;
+      const span = document.createElement('span');
+      span.className = 'tab-name'; span.textContent = newName; span.title = newName;
+      input.replaceWith(span);
+      this.renameTab(tabId, newName);
+    };
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', (ke) => {
+      if (ke.key === 'Enter') commit();
+      if (ke.key === 'Escape') { input.value = oldName; commit(); }
+    });
+  }
+
+  /** 右键菜单 */
+  private _showContextMenu(x: number, y: number, tabId: string): void {
+    // 删除旧菜单
+    document.querySelector('.tab-context-menu')?.remove();
+
+    const menu = document.createElement('div');
+    menu.className = 'tab-context-menu';
+    menu.style.left = `${x}px`; menu.style.top = `${y}px`;
+
+    const items = [
+      { label: '✏️ 改名', action: () => {
+        const el = this.listEl.querySelector(`[data-id="${tabId}"]`) as HTMLElement;
+        if (el) this._startRename(tabId, el);
+      }},
+      { label: '📋 复制会话ID', action: () => {
+        navigator.clipboard.writeText(tabId).catch(() => {});
+      }},
+      { label: '✕ 关闭', action: () => this.closeTab(tabId) },
+    ];
+
+    menu.innerHTML = items.map(it =>
+      `<div class="tab-menu-item">${it.label}</div>`
+    ).join('');
+
+    items.forEach((it, i) => {
+      menu.children[i].addEventListener('click', () => {
+        menu.remove();
+        it.action();
+      });
+    });
+
+    document.body.appendChild(menu);
+
+    // 点击外部关闭
+    const close = (e: MouseEvent) => {
+      if (!menu.contains(e.target as Node)) {
+        menu.remove();
+        document.removeEventListener('click', close);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', close), 0);
   }
 }

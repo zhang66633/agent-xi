@@ -419,6 +419,22 @@ async def _handle_command(
             ]
             await ws.send_json({"type": "system", "message": "\n".join(lines)})
 
+        case "/search":
+            query_text = parts[1].strip() if len(parts) > 1 else ""
+            if not query_text or not brain:
+                await ws.send_json({"type":"system","message":"用法: /search <关键词>"})
+                return
+            # 作为对话消息处理（让 LLM 自动调用 web_search 工具）
+            try:
+                async for event in brain.chat(f"请联网搜索以下内容，用中文总结结果：{query_text}"):
+                    ws_msg = _event_to_ws_message(event)
+                    if ws_msg: await ws.send_json(ws_msg)
+            except Exception as e:
+                await ws.send_json({"type":"error","message":f"搜索失败：{e}"})
+            await ws.send_json({"type":"done"})
+            if session_manager:
+                session_manager.save_session(session)
+
         case "/allow":
             tool_name = parts[1].strip() if len(parts) > 1 else ""
             if not tool_name or not brain:
@@ -450,8 +466,8 @@ async def _handle_command(
                 "message": (
                     "/clear（清空）/undo（撤销）/history（轮次）\n"
                     "/status（状态）/memory（记忆）/skills（技能）\n"
-                    "/remember <内容>（记住）/allow <工具>（放行）\n"
-                    "/export（导出）/help（帮助）"
+                    "/search <关键词>（联网搜索）/remember <内容>（记住）\n"
+                    "/allow <工具>（放行）/export（导出）/help（帮助）"
                 ),
             })
 

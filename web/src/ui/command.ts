@@ -16,6 +16,7 @@ const SLASH_COMMANDS: CmdEntry[] = [
   { name: '/status', desc: '系统状态总览' },
   { name: '/memory', desc: '记忆统计' },
   { name: '/skills', desc: '已装技能列表' },
+  { name: '/search ', desc: '联网搜索关键词' },
   { name: '/remember ', desc: '记住一条信息' },
   { name: '/allow ', desc: '临时放行工具' },
   { name: '/export', desc: '导出对话 Markdown' },
