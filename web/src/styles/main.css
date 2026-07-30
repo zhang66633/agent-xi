@@ -652,6 +652,13 @@ html, body {
   border-color: var(--c-error-deep);
   animation: pulse-stop 1s steps(2) infinite;
 }
+
+/* 命令补全下拉 */
+.cmd-dropdown{position:absolute;bottom:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:var(--wood-darkest);border:2px solid var(--gold-deep);box-shadow:0 -4px 12px rgba(0,0,0,.6);z-index:100;margin-bottom:2px}
+.cmd-dropdown-item{padding:5px 10px;font-family:var(--font-mono);font-size:11px;color:var(--text-on-dark);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.cmd-dropdown-item:hover,.cmd-dropdown-item.active{background:rgba(244,208,63,.12);color:var(--gold-bright)}
+.cmd-dropdown-item .cmd-name{color:var(--gold-bright)}
+.cmd-dropdown-item .cmd-desc{color:var(--text-light);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @keyframes pulse-stop {
   0%,100% { opacity: 1; }
   50% { opacity: .7; }
