@@ -516,6 +516,76 @@ async def _handle_command(
             if session_manager:
                 session_manager.save_session(session)
 
+        case "/skill":
+            cmd_type = parts[1].split()[0].strip() if len(parts) > 1 else ""
+            skill_name = parts[1][len(cmd_type):].strip() if len(parts) > 1 and len(parts[1]) > len(cmd_type) else ""
+            if cmd_type == "create" and skill_name and brain:
+                from pathlib import Path as _P
+                skills_dir = _P(__file__).parent.parent.parent.parent / "config" / "skills" / skill_name
+                skills_dir.mkdir(parents=True, exist_ok=True)
+                skill_md = skills_dir / "SKILL.md"
+                # 从当前对话上下文中提取最近一轮作为 skill 内容
+                hist_text = "\n".join(m.text[:200] for m in brain.history[-6:])
+                content = f"""---
+name: {skill_name}
+description: 从对话中提取的技能
+keywords: [{skill_name}]
+category: 自定义
+---
+
+## 执行步骤
+
+（从以下对话中提取的流程，请根据需要修改）
+
+{hist_text}
+"""
+                skill_md.write_text(content, encoding="utf-8")
+                # 重新加载到 store
+                if hasattr(brain, '_skill_matcher') and brain._skill_matcher:
+                    store = brain._skill_matcher._store
+                    from ..skills.models import Skill
+                    s = Skill(id=skill_name, name=skill_name, description="从对话创建",
+                              steps=content, trigger_keywords=[skill_name], category="自定义")
+                    await store.save(s)
+                await ws.send_json({"type":"system","message":f"技能已创建: config/skills/{skill_name}/SKILL.md\n下一步: 编辑此文件完善执行步骤"})
+            else:
+                await ws.send_json({"type":"system","message":"用法:\n/skill list — 列出所有技能\n/skill create <名称> — 从对话创建技能"})
+
+        case "/mcp":
+            mcp_action = parts[1].split()[0].strip() if len(parts) > 1 else ""
+            mcp_args = parts[1][len(mcp_action):].strip() if len(parts) > 1 else ""
+            if mcp_action == "add" and mcp_args:
+                import yaml as _yaml
+                from pathlib import Path as _P
+                add_parts = mcp_args.split(maxsplit=1)
+                mcp_name = add_parts[0]
+                mcp_cmd = add_parts[1] if len(add_parts) > 1 else ""
+                mcp_yaml = _P(__file__).parent.parent.parent.parent / "config" / "mcp.yaml"
+                config = _yaml.safe_load(mcp_yaml.read_text(encoding="utf-8")) if mcp_yaml.exists() else {}
+                if not isinstance(config.get("servers"), list): config["servers"] = []
+                config["servers"].append({"name": mcp_name, "command": mcp_cmd.split()[0],
+                    "args": mcp_cmd.split()[1:] if len(mcp_cmd.split()) > 1 else [], "enabled": True})
+                mcp_yaml.write_text(_yaml.dump(config, allow_unicode=True), encoding="utf-8")
+                await ws.send_json({"type":"system","message":f"MCP已添加: {mcp_name} ({mcp_cmd})\n需重启后端生效"})
+            elif mcp_action == "list":
+                from pathlib import Path as _P
+                import yaml as _yaml
+                mcp_yaml = _P(__file__).parent.parent.parent.parent / "config" / "mcp.yaml"
+                if mcp_yaml.exists():
+                    config = _yaml.safe_load(mcp_yaml.read_text(encoding="utf-8"))
+                    servers = config.get("servers", []) if isinstance(config, dict) else []
+                    if servers:
+                        lines = [f"MCP 服务器 ({len(servers)} 个):"]
+                        for s in servers:
+                            lines.append(f"  - {s.get('name','?')}: {s.get('command','?')} {' '.join(s.get('args',[]))}")
+                        await ws.send_json({"type":"system","message":"\n".join(lines)})
+                    else:
+                        await ws.send_json({"type":"system","message":"没有配置 MCP 服务器"})
+                else:
+                    await ws.send_json({"type":"system","message":"config/mcp.yaml 不存在"})
+            else:
+                await ws.send_json({"type":"system","message":"用法:\n/mcp list — 列出MCP服务器\n/mcp add <名称> <命令> [参数...] — 添加MCP服务器"})
+
         case "/allow":
             tool_name = parts[1].strip() if len(parts) > 1 else ""
             if not tool_name or not brain:
