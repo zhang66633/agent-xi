@@ -226,10 +226,13 @@ def create_app(session_manager: SessionManager) -> FastAPI:
         if item_type == "mcp":
             from .market import install_mcp
             env = data.get("env") if isinstance(data.get("env"), dict) else None
-            result = install_mcp(item_id, env)
+            cmd = data.get("command", "")
+            args = data.get("args") if isinstance(data.get("args"), list) else None
+            result = install_mcp(item_id, env, command=cmd, args=args)
         elif item_type == "skill":
             from .market import install_skill
-            result = await install_skill(item_id, _skill_store())
+            extras = {k: v for k, v in data.items() if k not in ("type","id")}
+            result = await install_skill(item_id, _skill_store(), **extras)
         else:
             return {"ok": False, "error": f"未知类型: {item_type}"}
 

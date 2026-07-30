@@ -63,6 +63,7 @@ export class MarketView {
           <button class="market-tab" data-tab="skill">技能包</button>
         </div>
         <div class="market-hint">MCP 变更需重启后端生效 · 技能即装即用</div>
+        <button class="mc-btn" id="btn-manual-add">+ 手动添加</button>
       </div>
       <div class="market-grid"></div>
     `;
@@ -79,6 +80,12 @@ export class MarketView {
         }
       });
     });
+
+    // 手动添加按钮
+    const addBtn = document.getElementById('btn-manual-add');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => this._onManualAdd());
+    }
   }
 
   // ─── 渲染 ─────────────────────────────────────────────
@@ -142,6 +149,133 @@ export class MarketView {
         </div>
       </div>
     `;
+  }
+
+  // ─── 手动添加 ─────────────────────────────────────────
+
+  private _onManualAdd(): void {
+    if (this.tab === 'mcp') this._showMcpAddForm();
+    else this._showSkillAddForm();
+  }
+
+  private _showMcpAddForm(): void {
+    this.modal.show('手动添加 MCP 服务器', `
+      <div class="env-form">
+        <label class="env-field">
+          <span class="env-key">名称</span>
+          <input class="env-input" id="mcp-name" placeholder="如 filesystem" />
+        </label>
+        <label class="env-field">
+          <span class="env-key">命令</span>
+          <input class="env-input" id="mcp-cmd" placeholder="如 npx -y @server/filesystem /path" />
+        </label>
+        <label class="env-field">
+          <span class="env-key">环境变量 (KEY=VALUE, 每行一个)</span>
+          <textarea class="env-input" id="mcp-env" rows="3" placeholder="GITHUB_TOKEN=xxx" style="resize:vertical;font-family:monospace"></textarea>
+        </label>
+      </div>
+      <div class="market-modal-note">写入 config/mcp.yaml，重启后端后生效</div>
+      <div class="confirm-actions">
+        <button class="btn-confirm btn-cancel" id="mcp-cancel">取消</button>
+        <button class="btn-confirm btn-allow" id="mcp-confirm">添加</button>
+      </div>
+    `);
+    document.getElementById('mcp-cancel')?.addEventListener('click', () => this.modal.close());
+    document.getElementById('mcp-confirm')?.addEventListener('click', () => {
+      const name = (document.getElementById('mcp-name') as HTMLInputElement).value.trim();
+      const cmd = (document.getElementById('mcp-cmd') as HTMLInputElement).value.trim();
+      const envText = (document.getElementById('mcp-env') as HTMLTextAreaElement).value.trim();
+      if (!name || !cmd) { this._emit('名称和命令不能为空', 'error'); return; }
+      const env: Record<string,string> = {};
+      if (envText) {
+        envText.split('\n').forEach(line => {
+          const [k,...v] = line.split('=');
+          if (k && v.length) env[k.trim()] = v.join('=').trim();
+        });
+      }
+      this.modal.close();
+      void this._doMcpAdd(name, cmd, env);
+    });
+  }
+
+  private async _doMcpAdd(name: string, cmd: string, env: Record<string,string>): Promise<void> {
+    try {
+      const parts = cmd.split(/\s+/);
+      const res = await fetch(`${location.protocol}//${location.hostname}:9731/api/market/install`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({type:'mcp', id:name, command:parts[0], args:parts.slice(1), env}),
+      });
+      const data = await res.json() as {ok:boolean;error?:string;message?:string};
+      if (data.ok) this._emit(data.message ?? '已添加', 'system');
+      else this._emit(data.error ?? '添加失败', 'error');
+      await this.refresh();
+    } catch(e) {
+      this._emit(`添加失败: ${e}`, 'error');
+    }
+  }
+
+  private _showSkillAddForm(): void {
+    this.modal.show('手动创建技能', `
+      <div class="env-form">
+        <label class="env-field">
+          <span class="env-key">ID (英文标识)</span>
+          <input class="env-input" id="skill-id" placeholder="如 my-deploy" />
+        </label>
+        <label class="env-field">
+          <span class="env-key">名称</span>
+          <input class="env-input" id="skill-name" placeholder="如 一键部署" />
+        </label>
+        <label class="env-field">
+          <span class="env-key">描述</span>
+          <input class="env-input" id="skill-desc" placeholder="描述这个技能做什么" />
+        </label>
+        <label class="env-field">
+          <span class="env-key">关键词 (逗号分隔)</span>
+          <input class="env-input" id="skill-kw" placeholder="部署,deploy,上线" />
+        </label>
+        <label class="env-field">
+          <span class="env-key">执行步骤 (Markdown)</span>
+          <textarea class="env-input" id="skill-steps" rows="6" placeholder="1. 检查环境变量&#10;2. 构建项目&#10;3. 部署到服务器" style="resize:vertical;font-family:monospace"></textarea>
+        </label>
+        <label class="env-field">
+          <span class="env-key">分类</span>
+          <input class="env-input" id="skill-cat" placeholder="开发/运维/数据/办公" />
+        </label>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn-confirm btn-cancel" id="skill-cancel">取消</button>
+        <button class="btn-confirm btn-allow" id="skill-confirm">创建</button>
+      </div>
+    `);
+    document.getElementById('skill-cancel')?.addEventListener('click', () => this.modal.close());
+    document.getElementById('skill-confirm')?.addEventListener('click', () => {
+      const id = (document.getElementById('skill-id') as HTMLInputElement).value.trim();
+      const name = (document.getElementById('skill-name') as HTMLInputElement).value.trim();
+      const desc = (document.getElementById('skill-desc') as HTMLInputElement).value.trim();
+      const kw = (document.getElementById('skill-kw') as HTMLInputElement).value.trim();
+      const steps = (document.getElementById('skill-steps') as HTMLTextAreaElement).value.trim();
+      const cat = (document.getElementById('skill-cat') as HTMLInputElement).value.trim();
+      if (!id || !name) { this._emit('ID 和名称不能为空', 'error'); return; }
+      this.modal.close();
+      void this._doSkillAdd({id, name, description: desc, keywords: kw.split(/[,，]/).map(s=>s.trim()).filter(Boolean), steps, category: cat});
+    });
+  }
+
+  private async _doSkillAdd(info: Record<string,unknown>): Promise<void> {
+    try {
+      const res = await fetch(`${location.protocol}//${location.hostname}:9731/api/market/install`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({type:'skill', ...info}),
+      });
+      const data = await res.json() as {ok:boolean;error?:string;message?:string};
+      if (data.ok) this._emit(data.message ?? '已创建', 'system');
+      else this._emit(data.error ?? '创建失败', 'error');
+      await this.refresh();
+    } catch(e) {
+      this._emit(`创建失败: ${e}`, 'error');
+    }
   }
 
   // ─── 安装流程 ─────────────────────────────────────────

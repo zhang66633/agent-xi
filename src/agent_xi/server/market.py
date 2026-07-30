@@ -312,41 +312,41 @@ def _save_mcp_config(config: dict) -> None:
 # ─── 安装 / 卸载逻辑 ──────────────────────────────────────────
 
 
-def install_mcp(item_id: str, env: dict | None = None) -> dict:
+def install_mcp(item_id: str, env: dict | None = None,
+                command: str = "", args: list[str] | None = None) -> dict:
     """将 MCP 服务器配置写入 config/mcp.yaml。
 
-    env: 客户端填入的环境变量值（如 GITHUB_TOKEN），
-         与市场默认 env 键合并后写入。
+    支持两种模式：
+    1. 市场安装：item_id 在 MCP_MARKET 中
+    2. 手动添加：传递 command + args
     """
-    item = next((m for m in MCP_MARKET if m["id"] == item_id), None)
-    if not item:
-        return {"ok": False, "error": f"未找到 MCP: {item_id}"}
-
+    # 检查是否已安装
     config = _load_mcp_config()
     servers: list = config["servers"]
-
-    # 检查是否已安装
     if any(s.get("name") == item_id for s in servers):
-        return {"ok": False, "error": f"{item['name']} 已安装"}
+        return {"ok": False, "error": f"已存在同名 MCP: {item_id}"}
 
-    # 写入新服务器配置
-    new_entry: dict = {
-        "name": item_id,
-        "command": item["command"],
-        "args": item["args"],
-    }
-    if "env" in item:
-        merged = dict(item["env"])          # 默认键（空值）
+    # 市场安装
+    item = next((m for m in MCP_MARKET if m["id"] == item_id), None)
+    if item:
+        new_entry: dict = {"name": item_id, "command": item["command"], "args": item["args"]}
+        if "env" in item:
+            merged = dict(item["env"])
+            if env: merged.update({k: v for k, v in env.items() if v})
+            new_entry["env"] = merged
+        item["installed"] = True
+    elif command:
+        # 手动添加
+        new_entry = {"name": item_id, "command": command, "args": args or []}
         if env:
-            merged.update({k: v for k, v in env.items() if v})
-        new_entry["env"] = merged
+            new_entry["env"] = env
+    else:
+        return {"ok": False, "error": f"未找到 MCP: {item_id}"}
 
     servers.append(new_entry)
     _save_mcp_config(config)
-
-    item["installed"] = True
     logger.info("MCP installed: %s", item_id)
-    return {"ok": True, "message": f"{item['name']} 已安装，重启后生效"}
+    return {"ok": True, "message": f"{item_id} 已添加，重启后生效"}
 
 
 def uninstall_mcp(item_id: str) -> dict:
@@ -369,39 +369,47 @@ def uninstall_mcp(item_id: str) -> dict:
     return {"ok": True, "message": f"{item['name']} 已卸载，重启后生效"}
 
 
-async def install_skill(item_id: str, store: SkillStore | None) -> dict:
-    """将技能写入 skills 数据库。
+async def install_skill(item_id: str, store: SkillStore | None, **extras) -> dict:
+    """将技能写入 skills 数据库。支持市场安装和手动创建。
 
-    store 由调用方注入（SessionManager 持有的同一实例），
-    避免重复打开 SQLite/LanceDB 连接。
+    extras 可包含: name, description, keywords, steps, category 等手动创建字段。
     """
-    item = next((s for s in SKILL_MARKET if s["id"] == item_id), None)
-    if not item:
-        return {"ok": False, "error": f"未找到技能: {item_id}"}
     if store is None:
-        return {"ok": False, "error": "技能存储不可用（embedding 未配置？）"}
+        return {"ok": False, "error": "技能存储不可用"}
 
-    # 延迟导入避免循环依赖
-    try:
-        from ..skills.models import Skill
-
+    # 市场安装
+    item = next((s for s in SKILL_MARKET if s["id"] == item_id), None)
+    if item:
         if store.get(item_id) is not None:
             return {"ok": False, "error": f"{item['name']} 已安装"}
+        try:
+            from ..skills.models import Skill
+            skill = Skill(id=item_id, name=item["name"], description=item["description"],
+                          trigger_keywords=item["keywords"], steps=item["steps"])
+            await store.save(skill)
+            item["installed"] = True
+            logger.info("Skill installed: %s", item_id)
+            return {"ok": True, "message": f"{item['name']} 已安装"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
+    # 手动创建
+    if extras.get("name"):
+        from ..skills.models import Skill
+        if store.get(item_id) is not None:
+            return {"ok": False, "error": f"技能 {item_id} 已存在"}
         skill = Skill(
             id=item_id,
-            name=item["name"],
-            description=item["description"],
-            trigger_keywords=item["keywords"],
-            steps=item["steps"],
+            name=extras.get("name", item_id),
+            description=extras.get("description", ""),
+            trigger_keywords=extras.get("keywords", []),
+            steps=extras.get("steps", ""),
+            category=extras.get("category", ""),
         )
         await store.save(skill)
-        item["installed"] = True
-        logger.info("Skill installed: %s", item_id)
-        return {"ok": True, "message": f"{item['name']} 已安装"}
-    except Exception as e:
-        logger.error("Skill install failed: %s", e)
-        return {"ok": False, "error": str(e)}
+        logger.info("Skill created: %s", item_id)
+        return {"ok": True, "message": f"技能 {item_id} 已创建"}
+    return {"ok": False, "error": f"未找到技能: {item_id}"}
 
 
 async def uninstall_skill(item_id: str, store: SkillStore | None) -> dict:
