@@ -94,8 +94,9 @@ class Brain:
         self._data_dir: Any = None
         self._session_id: str = ""
 
-        # Phase 4: 权限拒绝追踪
+        # Phase 4: 权限拒绝追踪 + 临时白名单
         self._permission_denials: list[dict[str, Any]] = []
+        self._allowed_tools: set[str] = set()
 
         # Phase 4: 用量追踪回调（外部注入）
         self._usage_callback: Callable[[str, str, int, int], None] | None = None
@@ -426,7 +427,10 @@ class Brain:
         # 安全确认
         from ..tools.base import SecurityLevel
 
-        if tool.security_level in (
+        # /allow 白名单：跳过确认
+        if tool_use.name in self._allowed_tools:
+            pass  # 直接放行，不检查 security_level
+        elif tool.security_level in (
             SecurityLevel.SENSITIVE,
             SecurityLevel.DANGEROUS,
             SecurityLevel.ASK_EVERY,
@@ -606,6 +610,7 @@ class Brain:
         """清空对话历史（开始新对话）。"""
         self._history.clear()
         self._permission_denials.clear()
+        self._allowed_tools.clear()
 
     def inject_message(self, message: Message) -> None:
         """向历史中注入消息（用于系统消息、记忆注入等）。"""

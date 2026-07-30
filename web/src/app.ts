@@ -134,13 +134,22 @@ export class App {
       this.tabs.switchTo(initialId);
     }
     this.tabs.onTabSwitch((tabId) => {
+      this.ws.sendCommand('/clear');  // 触发旧会话保存
       this.ws.reconnectWith(tabId);
       this.log.clear();
+      setTimeout(() => {
+        this.log.append({id:`welcome-${Date.now()}`,time:this._now(),type:'system',
+          text:'已切换到会话'});
+      }, 300);
     });
     this.tabs.onTabNew(() => {
       const id = crypto.randomUUID();
       this.ws.reconnectWith(id);
       this.log.clear();
+      setTimeout(() => {
+        this.log.append({id:`welcome-${Date.now()}`,time:this._now(),type:'system',
+          text:'✦ 新会话已就绪 | 输入消息开始对话'});
+      }, 500);
       return id;
     });
     this.tabs.onTabClose((tabId) => {

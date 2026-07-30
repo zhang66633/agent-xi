@@ -419,6 +419,19 @@ async def _handle_command(
             ]
             await ws.send_json({"type": "system", "message": "\n".join(lines)})
 
+        case "/allow":
+            tool_name = parts[1].strip() if len(parts) > 1 else ""
+            if not tool_name or not brain:
+                await ws.send_json({"type":"system","message":"用法: /allow <工具名>"})
+                return
+            if not hasattr(brain, '_allowed_tools'):
+                brain._allowed_tools = set()
+            if brain._tools and brain._tools.get(tool_name):
+                brain._allowed_tools.add(tool_name)
+                await ws.send_json({"type":"system","message":f"已放行: {tool_name}（本次会话有效 | /clear 后重置）"})
+            else:
+                await ws.send_json({"type":"system","message":f"未找到工具: {tool_name}"})
+
         case "/export":
             if not brain:
                 await ws.send_json({"type": "system","message": "会话未初始化"})
