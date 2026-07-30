@@ -7,8 +7,8 @@ from typing import Any
 
 from ..base import SecurityLevel, Tool, ToolResult
 
-# 文件最大读取大小（字符数）
-_MAX_FILE_SIZE = 10000
+# 文件最大读取大小（字符数）— 50000 对标 Claude Code
+_MAX_FILE_SIZE = 50000
 
 
 class ReadFileTool(Tool):
@@ -41,7 +41,7 @@ class ReadFileTool(Tool):
                 },
                 "num_lines": {
                     "type": "integer",
-                    "description": "读取的行数，默认读取全部（最多 200 行）",
+                    "description": "读取的行数，默认 2000（对标 Claude Code）",
                 },
             },
             "required": ["path"],
@@ -50,6 +50,25 @@ class ReadFileTool(Tool):
     @property
     def security_level(self) -> SecurityLevel:
         return SecurityLevel.SAFE
+
+    @property
+    def is_read_only(self) -> bool:
+        return True
+
+    @property
+    def is_concurrency_safe(self) -> bool:
+        return True
+
+    @property
+    def max_result_size(self) -> int:
+        return _MAX_FILE_SIZE
+
+    def tool_prompt(self) -> str:
+        return (
+            "- **read_file**: 读取文本文件内容。支持 start_line 和 num_lines 分页（默认 2000 行），"
+            "最大 50000 字符。适用于代码文件、配置文件、文本文件。"
+            "二进制文件返回错误提示。"
+        )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
         file_path = kwargs.get("path", "")

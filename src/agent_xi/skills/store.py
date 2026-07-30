@@ -42,7 +42,7 @@ class SkillStore:
         self._table: Any = None  # 延迟创建
 
     def _init_db(self) -> None:
-        """初始化 SQLite 表。"""
+        """初始化 SQLite 表（含自动迁移）。"""
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS skills (
                 id TEXT PRIMARY KEY,
@@ -53,14 +53,30 @@ class SkillStore:
                 parameters TEXT NOT NULL DEFAULT '{}',
                 created_at REAL NOT NULL,
                 last_used REAL NOT NULL DEFAULT 0,
-                use_count INTEGER NOT NULL DEFAULT 0
+                use_count INTEGER NOT NULL DEFAULT 0,
+                tags TEXT NOT NULL DEFAULT '[]',
+                category TEXT NOT NULL DEFAULT ''
             )
         """)
         self._conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_skills_name
             ON skills(name)
         """)
+        # 迁移：为旧数据库追加缺失列
+        self._migrate_add_column("skills", "tags", "TEXT NOT NULL DEFAULT '[]'")
+        self._migrate_add_column("skills", "category", "TEXT NOT NULL DEFAULT ''")
+        self._conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_skills_category
+            ON skills(category)
+        """)
         self._conn.commit()
+
+    def _migrate_add_column(self, table: str, column: str, col_def: str) -> None:
+        """安全添加列：列不存在时才 ALTER TABLE。"""
+        try:
+            self._conn.execute(f"SELECT {column} FROM {table} LIMIT 1")
+        except sqlite3.OperationalError:
+            self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
 
     async def save(self, skill: Skill) -> str:
         """存储技能（SQLite + LanceDB 向量）。"""
@@ -68,8 +84,8 @@ class SkillStore:
         self._conn.execute(
             """INSERT OR REPLACE INTO skills
                (id, name, description, steps, trigger_keywords,
-                parameters, created_at, last_used, use_count)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                parameters, created_at, last_used, use_count, tags, category)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 skill.id,
                 skill.name,
@@ -80,6 +96,8 @@ class SkillStore:
                 skill.created_at,
                 skill.last_used,
                 skill.use_count,
+                json.dumps(skill.tags, ensure_ascii=False),
+                skill.category,
             ),
         )
         self._conn.commit()
@@ -204,4 +222,6 @@ class SkillStore:
             created_at=row["created_at"],
             last_used=row["last_used"],
             use_count=row["use_count"],
+            tags=json.loads(row["tags"]) if row["tags"] else [],
+            category=row["category"] if "category" in row.keys() else "",
         )

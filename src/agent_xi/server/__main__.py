@@ -52,6 +52,7 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
     from .app import create_app
     from .history_store import SessionStore
     from .session import SessionManager
+    from .usage_tracker import UsageTracker
 
     async with create_client(settings.llm) as client:
         # 数据目录
@@ -92,8 +93,10 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
 
         # System prompt
         prompt_builder = PromptBuilder()
+        all_tools = registry.list_tools()
         system_prompt = prompt_builder.build(
             tools=registry.to_definitions(),
+            tool_objects=all_tools,
             has_memory=True,
         )
 
@@ -110,6 +113,10 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
             reserved_output_tokens=settings.reserved_output_tokens,
             store=session_store,
         )
+
+        # Usage tracker（用量统计 & 成本追踪）
+        usage_tracker = UsageTracker(data_dir)
+        session_mgr._usage_tracker = usage_tracker
 
         # FastAPI app
         app = create_app(session_mgr)
@@ -140,6 +147,7 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
             skill_store.close()
             await embedding_client.close()
             memory.close()
+            usage_tracker.close()
 
 
 if __name__ == "__main__":

@@ -22,12 +22,17 @@ KEY_REGISTRY: list[dict] = [
     {
         "var": "DEEPSEEK_API_KEY",
         "name": "DeepSeek",
-        "desc": "DeepSeek 对话模型（当前主用）",
+        "desc": "DeepSeek 对话模型（当前默认）",
     },
     {
         "var": "ANTHROPIC_API_KEY",
         "name": "Anthropic Claude",
-        "desc": "Claude 模型（切换 provider 时用）",
+        "desc": "Claude 模型（切换 provider 为 claude 时使用）",
+    },
+    {
+        "var": "OPENAI_API_KEY",
+        "name": "OpenAI",
+        "desc": "OpenAI 模型（ChatGPT / GPT-4o）",
     },
     {
         "var": "EMBEDDING_API_KEY",

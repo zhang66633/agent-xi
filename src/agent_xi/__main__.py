@@ -83,8 +83,10 @@ async def _async_main(settings: AppSettings) -> None:
         try:
             # 从模板渲染 system prompt（含工具列表 + 记忆指引）
             prompt_builder = PromptBuilder()
+            all_tools = registry.list_tools()
             system_prompt = prompt_builder.build(
                 tools=registry.to_definitions(),
+                tool_objects=all_tools,
                 has_memory=True,
             )
 

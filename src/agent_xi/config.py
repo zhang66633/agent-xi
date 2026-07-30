@@ -79,14 +79,20 @@ def _resolve_api_key(provider: str) -> str:
     支持的映射：
     - deepseek → DEEPSEEK_API_KEY
     - claude → ANTHROPIC_API_KEY
+    - openai → OPENAI_API_KEY
+    - ollama → "ollama"（本地服务不需要真实 key）
     """
     import os
 
     key_map: dict[str, str] = {
         "deepseek": "DEEPSEEK_API_KEY",
         "claude": "ANTHROPIC_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "ollama": "",  # 本地服务不需要 API Key
     }
     env_var = key_map.get(provider, "")
+    if not env_var:
+        return "ollama" if provider == "ollama" else ""
     return os.environ.get(env_var, "")
 
 

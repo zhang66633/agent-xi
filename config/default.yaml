@@ -3,7 +3,7 @@ llm:
   model: deepseek-chat
   base_url: https://api.deepseek.com
   temperature: 0.7
-  max_tokens: 4096
+  max_tokens: 8192
   timeout: 120.0
   max_retries: 3
 

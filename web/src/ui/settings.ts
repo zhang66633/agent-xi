@@ -1,19 +1,31 @@
 /**
- * 设置视图 — API Keys / 平台连接 / 记忆统计
+ * 设置视图 — API Keys / 平台连接 / 记忆统计 / 用量 / 主题
  *
  * Keys：masked 展示 + 保存写入 .env（提示重启生效）
  * 平台：纯状态展示占位（QQ/微信 Bot 阶段 6 再做）
  * 记忆：统计数字 + 最近 5 条语义记忆（只读）
+ * 用量：Token 使用趋势
+ * 主题：选择器 + localStorage 持久化
  */
 import { api, type KeyInfo } from '../net/api';
 import { WS_URL } from '../config';
 
 export type SettingsEventHandler = (text: string, kind: 'system' | 'error') => void;
 
+const THEMES = [
+  { id: '', name: '木色暗色', desc: '默认像素 RPG 暗色主题' },
+  { id: 'paper', name: '亮色纸', desc: '浅色纸张主题' },
+  { id: 'warm', name: '暖色经典', desc: '暖橙色调经典主题' },
+  { id: 'retro', name: '终端绿', desc: '经典 CRT 终端绿' },
+] as const;
+
+const THEME_STORAGE_KEY = 'agent_xi_theme';
+
 export class SettingsView {
   private root: HTMLElement;
   private keysEl!: HTMLElement;
   private memoryEl!: HTMLElement;
+  private usageEl!: HTMLElement;
   private onEvent: SettingsEventHandler | null = null;
 
   constructor() {
@@ -30,7 +42,11 @@ export class SettingsView {
 
   /** 进入视图时拉取最新数据 */
   async refresh(): Promise<void> {
-    await Promise.allSettled([this._loadKeys(), this._loadMemory()]);
+    await Promise.allSettled([
+      this._loadKeys(),
+      this._loadMemory(),
+      this._loadUsage(),
+    ]);
   }
 
   // ─── DOM 构建 ─────────────────────────────────────────
@@ -71,6 +87,17 @@ export class SettingsView {
         </section>
 
         <section class="set-panel">
+          <div class="set-panel-title">◆ 主题</div>
+          <div class="set-panel-note">选择界面主题，即时生效</div>
+          <div class="set-themes"></div>
+        </section>
+
+        <section class="set-panel">
+          <div class="set-panel-title">◆ 用量统计</div>
+          <div class="set-usage"></div>
+        </section>
+
+        <section class="set-panel">
           <div class="set-panel-title">◆ 记忆统计</div>
           <div class="set-memory"></div>
         </section>
@@ -78,6 +105,10 @@ export class SettingsView {
     `;
     this.keysEl = this.root.querySelector('.set-keys') as HTMLElement;
     this.memoryEl = this.root.querySelector('.set-memory') as HTMLElement;
+    this.usageEl = this.root.querySelector('.set-usage') as HTMLElement;
+
+    // 主题选择器
+    this._renderThemes();
   }
 
   // ─── API Keys ─────────────────────────────────────────
@@ -145,6 +176,97 @@ export class SettingsView {
     btn.removeAttribute('disabled');
     btn.textContent = '保存';
     await this._loadKeys();
+  }
+
+  // ─── 主题 ─────────────────────────────────────────────
+
+  private _renderThemes(): void {
+    const themesEl = this.root.querySelector('.set-themes') as HTMLElement;
+    const current = this._getTheme();
+
+    themesEl.innerHTML = THEMES.map((t) => `
+      <div class="set-key-row" style="cursor:pointer" data-theme="${this._escape(t.id)}">
+        <div class="set-key-info">
+          <div class="set-key-name">${this._escape(t.name)}${t.id === current ? ' ◀ 当前' : ''}</div>
+          <div class="set-key-desc">${this._escape(t.desc)}</div>
+        </div>
+        <div class="set-key-state${t.id === current ? '' : ' unset'}">
+          ${t.id === current ? '使用中' : ''}
+        </div>
+      </div>
+    `).join('');
+
+    themesEl.querySelectorAll<HTMLElement>('[data-theme]').forEach((row) => {
+      row.addEventListener('click', () => {
+        const tid = row.getAttribute('data-theme') ?? '';
+        this._setTheme(tid);
+        this._renderThemes();
+      });
+    });
+  }
+
+  private _getTheme(): string {
+    try {
+      return localStorage.getItem(THEME_STORAGE_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  private _setTheme(id: string): void {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, id);
+    } catch { /* ignore */ }
+    document.documentElement.setAttribute('data-theme', id);
+  }
+
+  // ─── 用量统计 ─────────────────────────────────────────
+
+  private async _loadUsage(): Promise<void> {
+    try {
+      const res = await fetch(`${location.protocol}//${location.hostname}:9731/api/usage/stats?days=7`);
+      const data = await res.json() as Record<string, unknown>;
+      if (!data.ok) {
+        this.usageEl.innerHTML = '<div class="set-empty">用量追踪未启用</div>';
+        return;
+      }
+      const summary = data.summary as Record<string, unknown>;
+      const daily = data.daily as Array<Record<string, unknown>> ?? [];
+
+      const maxCalls = Math.max(1, ...daily.map((d) => Number(d.calls) || 0));
+
+      this.usageEl.innerHTML = `
+        <div class="set-mem-stats">
+          <div class="set-mem-num">调用次数 <b>${summary.total_calls ?? 0}</b></div>
+          <div class="set-mem-num">输入 Token <b>${this._fmtNum(summary.total_input_tokens as number ?? 0)}</b></div>
+          <div class="set-mem-num">输出 Token <b>${this._fmtNum(summary.total_output_tokens as number ?? 0)}</b></div>
+          <div class="set-mem-num">费用 <b>$${((summary.total_cost_usd as number) ?? 0).toFixed(4)}</b></div>
+        </div>
+        <div class="set-panel-note">近 7 天调用趋势（柱状图）</div>
+        <div class="usage-chart">
+          ${daily.map((d) => {
+            const calls = Number(d.calls) || 0;
+            const h = Math.max(4, Math.round((calls / maxCalls) * 60));
+            const day = String(d.day ?? '').slice(5); // MM-DD
+            return `
+              <div class="usage-bar-col" title="${day}: ${calls} 次">
+                <div class="usage-bar" style="height:${h}px">${calls > 0 ? `<span class="usage-bar-num">${calls}</span>` : ''}</div>
+                <div class="usage-bar-label">${this._escape(day)}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch {
+      this.usageEl.innerHTML =
+        '<div class="set-empty">无法获取用量数据（后端未连接？）</div>';
+    }
+  }
+
+  private _fmtNum(n: number): string {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    return String(n);
   }
 
   // ─── 记忆统计 ─────────────────────────────────────────

@@ -23,6 +23,15 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.4",
 ]
+# Computer Use 可选依赖
+computer-use = [
+    "pyautogui>=0.9.54",
+    "Pillow>=10.0",
+]
+# Telegram Bot 可选依赖
+telegram = [
+    "python-telegram-bot>=21.0",
+]
 
 [project.scripts]
 agent-xi = "agent_xi.__main__:main"

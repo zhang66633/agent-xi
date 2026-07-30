@@ -143,13 +143,43 @@ async def test_unknown_tool_error():
 
 async def test_max_react_iterations_guard(echo_tool):
     """LLM 无限调工具 → 达到上限后安全退出。"""
-    # 6 个脚本全在调工具（上限 5 次迭代）
-    scripts = [[("tool", "echo", {"text": str(i)})] for i in range(6)]
+    # 35 个脚本全在调工具（上限 30 次迭代，超出 5 个来验证边界）
+    scripts = [[("tool", "echo", {"text": str(i)})] for i in range(35)]
     llm = ScriptedLLM(scripts)
     reg = ToolRegistry()
     reg.register(echo_tool)
     brain = _make_brain(llm, registry=reg)
 
     events = await _collect(brain, "循环调用")
-    # 不应无限执行：LLM 调用次数 <= 5
-    assert len(llm.requests) <= 5
+    # 不应无限执行：LLM 调用次数 <= 30
+    assert len(llm.requests) <= 30
+
+
+async def test_interrupt_mid_stream():
+    """中断测试：stream 中途 interrupt → 流被中止并返回错误事件。"""
+    import asyncio
+
+    llm = ScriptedLLM([
+        [("text", "这是"), ("text", "一个"), ("text", "很长的回复")],
+    ])
+    brain = _make_brain(llm)
+
+    events = []
+    stream_started = asyncio.Event()
+
+    async def _collect_with_interrupt():
+        async for ev in brain.chat("触发中断"):
+            events.append(ev)
+            # 在第一次 TEXT_DELTA 时触发中断
+            if ev.type == StreamEventType.TEXT_DELTA and not stream_started.is_set():
+                stream_started.set()
+                brain.interrupt()
+
+    await _collect_with_interrupt()
+
+    # 应该有 ERROR 事件
+    error_types = [e.type for e in events if e.type == StreamEventType.ERROR]
+    assert len(error_types) >= 1
+    # 应该有中断相关的错误信息
+    error_events = [e for e in events if e.type == StreamEventType.ERROR]
+    assert any("中断" in e.error for e in error_events)

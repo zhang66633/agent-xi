@@ -1850,6 +1850,102 @@ button,
 }
 
 /* ═══════════════════════════════════════════════════════════
+   主题系统 — 对标 cc-haha 的 6 色主题
+   用法: <html data-theme="paper"> 或 localStorage 持久化
+   ═══════════════════════════════════════════════════════════ */
+
+/* 默认主题 = 木色暗色（现有样式，无需额外覆盖） */
+
+/* 亮色纸主题 */
+[data-theme="paper"] {
+  --wood-darkest: #F0E8D8;
+  --wood-dark: #E8DCC8;
+  --wood-mid: #DDD0B8;
+  --wood-warm: #D4C4A8;
+  --wood-light: #B8A080;
+  --wood-pale: #9B8B6B;
+  --gold: #C8960C;
+  --gold-bright: #E0A800;
+  --gold-dark: #A07000;
+  --gold-deep: #805000;
+  --parchment: #FFFDF5;
+  --parchment-light: #FFFFFF;
+  --cream: #FFFEF8;
+  --text-dark: #3A2A10;
+  --text-mid: #6B5020;
+  --text-light: #8B7040;
+  --text-on-dark: #3A2A10;
+  --text-gold: #805000;
+}
+
+/* 暖色经典主题 */
+[data-theme="warm"] {
+  --wood-darkest: #1E0E04;
+  --wood-dark: #34180A;
+  --wood-mid: #4A2210;
+  --wood-warm: #5C2E16;
+  --wood-light: #8B4A28;
+  --wood-pale: #A86B40;
+  --gold: #FF8C42;
+  --gold-bright: #FFA64D;
+  --gold-dark: #D96E30;
+  --gold-deep: #A05020;
+  --parchment: #FFF0E0;
+  --parchment-light: #FFF5EC;
+  --cream: #FFFBF5;
+  --text-dark: #4A2210;
+  --text-mid: #8B4A28;
+  --text-light: #A86B40;
+  --text-on-dark: #F0C8A0;
+  --text-gold: #FF8C42;
+  --c-online: #6DBF6D;
+  --c-online-deep: #3A703A;
+  --c-idle: #FF8C42;
+  --c-idle-deep: #A05020;
+  --c-error: #D93B3B;
+  --c-error-deep: #8B2020;
+  --c-running: #5B9BD5;
+  --c-running-deep: #2C5F8A;
+  --heart: #D93B3B;
+  --heart-empty: #4A2828;
+}
+
+/* 经典终端绿主题 */
+[data-theme="retro"] {
+  --wood-darkest: #0A0E0A;
+  --wood-dark: #0E140E;
+  --wood-mid: #121A12;
+  --wood-warm: #162016;
+  --wood-light: #2A402A;
+  --wood-pale: #3A5A3A;
+  --gold: #33FF33;
+  --gold-bright: #66FF66;
+  --gold-dark: #00CC00;
+  --gold-deep: #009900;
+  --parchment: #0A1A0A;
+  --parchment-light: #0E200E;
+  --cream: #0A1A0A;
+  --text-dark: #33FF33;
+  --text-mid: #22CC22;
+  --text-light: #118811;
+  --text-on-dark: #33FF33;
+  --text-gold: #66FF66;
+  --c-online: #33FF33;
+  --c-online-deep: #00CC00;
+  --c-idle: #88FF88;
+  --c-idle-deep: #44AA44;
+  --c-error: #FF3333;
+  --c-error-deep: #CC0000;
+  --c-running: #33CCFF;
+  --c-running-deep: #0088CC;
+  --c-info: #88FF88;
+  --c-warn: #FFCC33;
+  --c-system: #AA88FF;
+  --heart: #FF3333;
+  --heart-empty: #331111;
+}
+
+/* ═══════════════════════════════════════════════════════════
    商店视图（P2）— tab / 卡片网格 / 状态徽章 / env 表单
    ═══════════════════════════════════════════════════════════ */
 

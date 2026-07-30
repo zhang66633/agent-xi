@@ -233,6 +233,45 @@ def create_app(session_manager: SessionManager) -> FastAPI:
             "profile": profile or "",
         }
 
+    # ─── 用量统计 API ─────────────────────────────────────────────
+
+    @app.get("/api/usage/stats")
+    async def usage_stats(days: int = 7) -> dict:
+        """用量统计（最近 N 天）。"""
+        tracker = getattr(session_manager, "_usage_tracker", None)
+        if not tracker:
+            return {"ok": False, "error": "用量追踪未启用"}
+
+        summary = tracker.get_summary(days=days)
+        daily = tracker.get_daily_breakdown(days=days)
+        return {
+            "ok": True,
+            "summary": {
+                "total_calls": summary.total_calls,
+                "total_input_tokens": summary.total_input_tokens,
+                "total_output_tokens": summary.total_output_tokens,
+                "total_cost_usd": summary.total_cost_usd,
+                "by_model": summary.by_model,
+            },
+            "daily": daily,
+        }
+
+    @app.get("/api/usage/total")
+    async def usage_total() -> dict:
+        """全部历史用量汇总。"""
+        tracker = getattr(session_manager, "_usage_tracker", None)
+        if not tracker:
+            return {"ok": False, "error": "用量追踪未启用"}
+
+        summary = tracker.get_total_summary()
+        return {
+            "ok": True,
+            "total_calls": summary.total_calls,
+            "total_input_tokens": summary.total_input_tokens,
+            "total_output_tokens": summary.total_output_tokens,
+            "total_cost_usd": summary.total_cost_usd,
+        }
+
     # ─── 上传 API ─────────────────────────────────────────────────
 
     @app.post("/api/upload")

@@ -24,6 +24,8 @@ class Skill:
     created_at: float = field(default_factory=time.time)
     last_used: float = 0.0
     use_count: int = 0
+    tags: list[str] = field(default_factory=list)  # 分类标签
+    category: str = ""  # 技能分类（开发/办公/数据/安全等）
 
     def touch(self) -> None:
         """更新使用统计。"""
