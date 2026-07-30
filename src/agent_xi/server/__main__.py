@@ -56,7 +56,7 @@ async def _async_main(settings: object, *, host: str = "127.0.0.1", port: int = 
     from .history_store import SessionStore
     from .session import SessionManager
     from .usage_tracker import UsageTracker
-from ..scheduler import SchedulerRunner, SchedulerStore
+    from ..scheduler import SchedulerRunner, SchedulerStore
 
     async with create_client(settings.llm) as client:
         # 数据目录
